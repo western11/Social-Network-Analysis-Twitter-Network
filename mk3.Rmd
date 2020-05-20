@@ -1,0 +1,362 @@
+---
+title: "mk3"
+author: "jojoecp"
+date: "5/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE,warning=FALSE}
+library(dplyr) #for data wrangling. very helpfull for preparing nodes and edges data
+library(data.table)
+library(lubridate)
+#library(network)
+library(igraph)
+library(tidygraph)
+library(ggraph)
+#library(visNetwork)
+#library(networkD3)
+# for twitter
+library(rtweet)
+```
+
+
+```{r}
+apikey <- "A5csjkdrS24vJ5ktiKYtgasFY"
+apisecret <- "rNXrBbaRFVRmuHgEM5AMpdSoDp9gtfOr2KAosXz5xozhmKfPrF"
+acctoken <- "1149867938477797376-xB3rmjq29qU8Alr9PBgGzkGumYU26j"
+tokensecret <- "Dyf3VncHDtJZ8FhtnQ5GfSPWrOIFsxUGpCrNrj6Z7Q1xP"
+
+token <- create_token(app = "Automated Twitter SNA",
+                      consumer_key = apikey,
+                      consumer_secret = apisecret,
+                      access_token = acctoken,
+                      access_secret = tokensecret)
+
+get_token()
+```
+
+# CASE 1: @teamalgoritma ego network
+
+- extract teamalgoritma follower
+- filter only active follower, by:
+  + last update (last 2 month)
+  + follower and following (min 150 and 100)
+- extract active follower's follower & following
+  + from their follower - following subset, build:
+    + friends network
+    + influencer network
+    + filter by high follower number as potential information spreading effectiveness
+
+
+## Algoritma Detail Profile
+```{r}
+algo <- lookup_users("teamalgoritma")
+
+folower <- get_followers("teamalgoritma",n = algo$followers_count,retryonratelimit = T)
+
+detail_folower <- lookup_users(folower$user_id)
+detail_folower <- data.frame(lapply(detail_folower,as.character),stringsAsFactors = F)
+
+detail_folower %>% arrange(-as.numeric(followers_count)) %>% 
+  select(screen_name,followers_count, friends_count, favourites_count)
+
+detail_folower %>% filter(screen_name == "btekno")
+table(as.factor(detail_folower$source))
+
+active_fol <- detail_folower %>% 
+  select(user_id,screen_name,created_at,followers_count,friends_count,favourites_count) %>%
+  mutate(created_at = ymd_hms(created_at),
+         followers_count = as.numeric(followers_count),
+         friends_count = as.numeric(friends_count),
+         favourites_count = as.numeric(favourites_count)) %>%
+  filter((followers_count > 100 & followers_count < 6000), friends_count > 75, favourites_count > 10, 
+         created_at > "2020-03-15" | is.na(created_at)) %>%
+  arrange(-followers_count)
+
+
+```
+
+## Retrieve Algoritma Follower
+
+```{r}
+foler3 <- vector(mode = 'list', length = length(active_fol$screen_name))
+names(foler3) <- active_fol$screen_name
+
+
+flt_n <- function(x){
+  if(x > 1500){
+    x*0.5
+  }else{x*0.75}
+}
+
+for (i in seq_along(active_fol$screen_name)) {
+  message("Getting followers for user #", i+122, "/161")
+  foler3[[i+122]] <- get_followers(active_fol$screen_name[i+122], 
+                                  n = round(flt_n(active_fol$followers_count[i+122])), 
+                                retryonratelimit = TRUE)
+  
+  if(i %% 5 == 0) Sys.sleep(5*60)
+    message("sleep for 5 minutes") 
+}
+
+```
+
+```{r}
+fol3 <- bind_rows(foler3, .id = "screen_name")
+all_folower <- rbind(fol1,fol2,fol3)
+active_fol_x <- active_fol %>% select(user_id,screen_name)
+
+all_folowerzz <- left_join(all_folower, active_fol_x, by="screen_name")
+
+algo_follower <- all_folowerzz %>% select(user_id.x,user_id.y) %>%
+  setNames(c("follower","active_user")) %>% 
+  na.omit()
+
+```
+
+
+## Retrieve Algoritma Following
+
+```{r}
+friend_3 <- data.frame()
+
+flt_n_2 <- function(x){
+  if(x > 2000){
+    x*0.4
+  }else{x*0.65}
+}
+
+for (i in seq_along(active_fol$screen_name)) {
+  message("Getting followers for user #", i+86, "/161")
+  kk <- get_friends(active_fol$screen_name[i+86],
+                        n = round(flt_n_2(active_fol$friends_count[i+86])),
+                        retryonratelimit = TRUE)
+  
+  friend_3 <- rbind(friend_3,kk)
+  
+  if(i %% 5 == 0){
+    Sys.sleep(5*60)
+    message("sleep for 5 minutes")
+    } 
+}
+
+```
+
+
+```{r}
+all_friend <- rbind(friend,friend_2,friend_3) %>%
+  setNames(c("screen_name","user_id"))
+all_friendzz <- left_join(all_friend, active_fol_x, by="screen_name")
+
+algo_friend <- all_friendzz %>% select(user_id.x,user_id.y) %>%
+  setNames(c("following","active_user"))
+
+## filter algo_friend$active_user that are not availiable in algo_follower
+
+missing_friend <- active_fol %>% filter(!user_id %in% algo_friend$active_user) %>%
+  select(user_id,screen_name,friends_count) %>%
+  filter(user_id %in% unique(algo_follower$active_user))
+
+
+
+
+
+active_X <- data.frame(cbind(from = active_fol$user_id),
+                       to = rep(algo$user_id,161))
+
+algo_friend[algo_friend=="943736953274482688"] <- "TeamAlgoritma"
+
+```
+
+retrieve missing following
+```{r}
+miss_friend <- data.frame()
+
+for (i in seq_along(missing_friend$screen_name)) {
+  message("Getting followers for user #", i, "/16")
+  kk <- get_friends(missing_friend$user_id[i],
+                        n = round(flt_n_2(missing_friend$friends_count[i])),
+                        retryonratelimit = TRUE)
+  
+  miss_friend <- rbind(miss_friend,kk)
+  
+  if(i %% 5 == 0){
+    Sys.sleep(5*60)
+    message("sleep for 5 minutes")
+    } 
+}
+
+
+miss_friend_2_name <- algo_follower %>% filter(!algo_follower$active_user %in% miss_friend$user_id)
+miss_friend_2_n <- active_fol %>% filter(user_id == miss_friend_2_name$active_user[1]) %>%
+  select(user_id,screen_name,friends_count)
+
+miss_friend_2 <- get_friends(miss_friend_2_name$active_user[1],
+                             n = round(flt_n_2(miss_friend_2_n$friends_count)),
+                             retryonratelimit = T)
+
+miss_friend_all <- rbind(miss_friend,miss_friend_2)
+
+
+```
+
+```{r}
+miss_friend_all <- miss_friend_all[,c(2,1)]
+miss_friend_all <- miss_friend_all %>% setNames(c("following","active_user"))
+algo_friend <- rbind(algo_friend,miss_friend_all)
+
+algo_follower <- algo_follower[algo_follower$active_user!="1152196355881705473",]
+
+f_algo <- algo_friend %>% filter(following == "943736953274482688")
+not_f_algo <- algo_friend %>% filter(!algo_friend$active_user %in% f_algo$active_user)
+not_f_df <- cbind(following = rep("943736953274482688",16),
+                  active_user = unique(not_f_algo$active_user)) %>% data.frame()
+
+algo_friend <- rbind(algo_friend,not_f_df)
+
+algo_friend <- algo_friend[duplicated(algo_friend[1:2]),]
+```
+
+```{r}
+un_active <- unique(algo_friend$active_user) %>% data.frame(stringsAsFactors = F) %>%
+  setNames("user")
+
+algo_mutual <- data.frame()
+
+for (i in seq_along(un_active$user)){
+  aa <- algo_friend %>% filter(active_user == un_active$user[i])
+  bb <- aa %>% filter(aa$following %in% algo_follower$follower) %>%
+    setNames(c("mutual","active_user"))
+  
+  algo_mutual <- rbind(algo_mutual,bb)
+}
+
+```
+# Build Network
+
+## Nodes
+```{r}
+nodes <- data.frame(V = unique(c(algo_mutual$mutual,algo_mutual$active_user)),
+                    stringsAsFactors = F)
+
+```
+
+## Edges
+```{r}
+edges <- algo_mutual %>% setNames(c("from","to"))
+
+
+```
+
+## Graph
+```{r}
+network_ego1 <- graph_from_data_frame(d = edges, vertices = nodes, directed = F) %>%
+  as_tbl_graph()
+
+network_ego1 <- network_ego1 %>% 
+  mutate(community = as.factor(group_walktrap())) %>%
+  mutate(strength = centrality_degree()) %>%
+  mutate(betweenness_c = centrality_betweenness(directed = F,normalized = T)) %>%
+  mutate(closeness_c = centrality_closeness(normalized = T)) %>%
+  mutate(degree_c = centrality_degree(normalized = T)) %>%
+  mutate(page_rank = centrality_pagerank(directed = F)) %>%
+  mutate(eigen = centrality_eigen(directed = F,scale = T))
+
+
+
+cw <- cluster_walktrap(network_ego1)
+member <- data.frame(v = 1:vcount(network_ego1), member = as.numeric(membership(cw)))
+between_c <- betweenness(network_ego1,v = V(network_ego1),directed = F,normalized = T) %>%
+  data.frame(stringsAsFactors = F) %>% setNames("betweenness")
+between_c <- tibble::rownames_to_column(between_c,"V")
+
+plot(simplify(g),
+     vertex.size= 0.01, edge.arrow.size=0.001,
+     vertex.label.cex = 0.75,vertex.label.color = "black"  ,
+     vertex.frame.color = adjustcolor("white", alpha.f = 0),
+     vertex.color = adjustcolor("white", alpha.f = 0),
+     edge.color=adjustcolor(1, alpha.f = 0.15),
+     display.isolates=FALSE,
+     vertex.label=ifelse(page_rank(g)$vector > 0.1 , "important nodes", NA))
+
+res_network <- simplify(contract(network_ego1, membership(cw)))
+
+V(res_network)$size <- log(strength(res_network))*2
+V(res_network)$label <- ifelse(strength(res_network)>=3, V(res_network)$name,NA)
+
+lay <- layout_with_kk(res_network)
+par(mar=c(0,0,0,0)); plot(res_network,layout = lay,
+                          vertex.size = 10,
+                          vertex.label = NA,
+                          vertex.color = membership(cw))
+
+V(network_ego1)$label <- ifelse(betweenness(network_ego1,v = V(network_ego1),
+                                            directed = F,normalized = T) >= 0.1,
+                                V(network_ego1)$name, NA)
+
+lay2 <- layout_with_fr(network_ego1)
+par(mar=c(0,0,0,0)); plot(simplify(network_ego1),layout = lay2,
+                          vertex.size = 10, vertex.label.cex = 0.5,
+                          vertex.color = membership(cw),
+                          edge.color = adjustcolor(1,alpha.f = 0.15))
+
+
+rain <- rainbow(89)
+E(network_ego1)$color <- apply(as.data.frame(get.edgelist(network_ego1)),1,
+                               function(x)ifelse(
+                                 V(network_ego1)$community[x[1]]== V(network_ego1)$community[x[2]],
+                                 rain[V(network_ego1)$community[x[1]]], "#00000000"))
+
+com_f <- as.data.frame(table(V(network_ego1)$community))
+com_f %>% arrange(-Freq)
+```
+
+```{r}
+library(extrafont)
+loadfonts(device = "win")
+# windowsFonts()
+```
+
+
+```{r}
+network_ego1 %>%
+  filter(community %in% 1:3) %>%
+  mutate(node_size = ifelse(strength >= 20,log(strength),0)) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(color = as.factor(community),size = node_size)) + 
+  theme_graph() + theme(legend.position = "none",text = element_text(family = "mono")) +
+  labs(title = "TeamAlgoritma Mutual Communities",
+       subtitle = "Top 3 Community")
+
+```
+
+```{r}
+network_ego1 %>%
+  filter(community %in% 1:3) %>%
+  mutate(node_label = ifelse(betweenness_c >= 0.05,name,"")) %>%
+  mutate(node_size = ifelse(betweenness_c >= 0.05,log(betweenness_c)+1,0)) %>%
+  ggraph(layout = "fr") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(color = as.factor(community),size = node_size)) +
+  geom_node_text(aes(label = node_label,size = node_size), 
+                 repel = T,color = "black", fontface = "bold") + 
+  theme_graph() + theme(legend.position = "none")
+
+```
+
+```{r}
+windowsFonts()
+names(wf[wf=="TT Courier New"])
+```
+
+
+To do next:
+- find account that not included in algo_friend v
+- subset account that not following "943736953274482688" in algo_friend v
+- filter account yang saling follow"an dari algo_friend dan algo_follower v
+- build ego network

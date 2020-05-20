@@ -1,0 +1,139 @@
+---
+title: "Social Network Analysis"
+author: "jojoecp"
+date: "5/18/2020"
+output:
+  html_document:
+   toc: true
+   toc_float: true
+   toc_depth: 2
+   theme: flatly
+   highlight: zenburn
+   df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      fig.align = "center")
+
+options(scipen = 999)
+```
+
+
+**Hello!**
+Welcome to my first internal training. In this markdown, we will learn about `Social Network Analysis` using various packages especially `tidygraph` (including `igraph` and `ggraph`). We'll not only learn about the visualizing stuff but also the metrics. We'll analyze Twitter network as our study case using `rtweet` package. After this internal training, I hope we will be able to do:   
+   
+- Analyze *Ego Network* from specific account/user   
+- Analyze *Competition Network* from various similar account/industries   
+- Analyze *Information Activity Network* from something that goes viral   
+
+**Note:** In 28 March 2019, Kak Eca already deliver a cool internal training about Twitter Interactions using `Twinetverse` <will input the link later>. It has similar idea with this study, we both explain about building network from Twitter data. The difference in this study is we're not only make visualization, but also calculate metrics to achieve the goals for every case (spoiler: we'll do 3 SNA cases). We'll also more focus to how to implement SNA and what it is. This study is theory-driven studies.
+
+<mind map>
+
+# Background {.tabset}
+## Introduction
+**What is Social Network Analysis (SNA)**
+A social network is a structure composed of a set of actors, some of which are connected by a set of one or more relations. *Social network analysis* work at describing underlying patterns of social structure, explaining the impact of such patterns in behaviour and attitudes. Social network analysis has 4 main types of network metrics, namely:     
+   
+- Network Models   
+- Key Players   
+- Tie Strength   
+- Network Cohesion   
+
+**So What? Why do we need them?**
+Humans are social beings. Even when you sleep, you're still connected to everyone in the world by your smartphone. Your smartphone keep sending and receive information like weather information, incoming whatsapp messages, late night One Piece update, and social media notification from your favourite bias. We're always connected and there's network everywhere. Somehow, some smart dudes behind the famous [Small World Theory](https://en.wikipedia.org/wiki/Small-world_network) found something from the network that quite exciting.
+
+Did you know you only [seperates by six step](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favourite person in the world? We are able to quantify what-so-called network and can be implemented in many fields. In this study we'll  only focus on two subject, Network Models and Key Players. Here's some implementation of SNA to enlight your knowledge about SNA a bit: (will put reference links later)
+
+- Business:   
+  + Social media segmentation   
+  + Information spreading through network (for marketing purpose)  
+  + Identify prominent person of a society (for identify best endorsment)   
+  + Mapping potential customer   
+  + Mapping tourism flow   
+  
+- Non-business:   
+  + Analyzing how something goes viral in social media   
+  + Identify diseases spread   
+  + Word embedding stuff   
+  + Implementation of small-world theory and Six degree separation of Kevin Bacon   
+  + will add more~   
+
+## Libraries
+Let's install required library for this study.
+```{r message=FALSE,warning=FALSE}
+# for data wrangling. very helpfull for preparing nodes and edges data
+library(dplyr) 
+library(data.table)
+library(lubridate)
+
+# for building network and visualization 
+library(tidygraph)
+# already included in tidygraph but just fyi
+library(igraph)
+library(ggraph)
+
+# for crawling Twitter data 
+library(rtweet)
+```
+
+# Let's Begin !
+## Prerequisites
+We'll crawl Twitter data using Twitter's rest API. Thus, we need authentication to use the API. To access the API, you will need to create a Twitter Developer Account here: https://developer.twitter.com/en (make sure you already have Twitter account). Creating Twitter developer account is simple and tend to be fast but it depend to how you describe what you will do with the API.   
+
+Good news! recent update of `rtweet` allows you to interact with Twitter API without create your own Twitter developer account. But it's better if you have one because it gives you more stability and permissions. If you need further explanation, you can head over rtweet’s official website [here](https://rtweet.info/).
+
+In this study, we'll crawl Twitter data without using access token as crendentials. but if things are going bad, i provide some access token we can use to crawl the data. **Note** Due to rate limit, and most of use will use it at the same time, please use the token wisely.
+
+```{r, eval=FALSE}
+apikey <- "A5csjkdrS2xxxxxxxxxxx"
+apisecret <- "rNXrBbaRFVRmuHgEM5AMpdxxxxxxxxxxxxxxxxxxxxxxx"
+acctoken <- "1149867938477797376-xB3rmjqxxxxxxxxxxxxxxxxxxx"
+tokensecret <- "Dyf3VncHDtJZ8FhtnQ5Gxxxxxxxxxxxxxxxxxxxxxx"
+
+token <- create_token(app = "Automated Twitter SNA",
+                      consumer_key = apikey,
+                      consumer_secret = apisecret,
+                      access_token = acctoken,
+                      access_secret = tokensecret)
+
+```
+
+```{r}
+# Note: Only run this code if you cant crawl the data without using any access token
+mytoken_1 <- readRDS("token_1.rds")
+#mytoken_2 <- readRDS("token_2.rds") # will add later
+
+# check if the token is active
+get_token()
+```
+
+## Case Objectives
+In this study, we try to solve this 3 cases:
+- Analyze **Ego Network** from @TeamAlgoritma Twitter account   
+  + Visualize top cluster from TeamAlgoritma mutual account   
+  + find out which account has the potential to spread information widely   
+  + Calculate the metrics, and find out who is the `key player` in TeamAlgoritma network   
+- Analyze **Competition Network** from @kfc_id, @mcd_id, @wendys, @phd account   
+  + Visualize the whole competition network    
+  + Identify fanbase cluster in each account   
+  + Calculate the metrics, and find out who is the `key player` in the whole network   
+- Analyze **Activity Network** given random keyword(s) or hashtag   
+  + Visualize the activity/information network   
+  + find out which cluster talk about which topic regarding the keyword   
+  + Calculate the metrics, and find out who is the `key player` in the whole conversation network   
+  
+# Case 1: TeamAlgoritma Ego Network
+
+
+
+
+
+
+
+
+
+
+
+
