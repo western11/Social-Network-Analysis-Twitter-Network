@@ -325,7 +325,7 @@ loadfonts(device = "win")
 ```{r}
 network_ego1 %>%
   filter(community %in% 1:3) %>%
-  mutate(node_size = ifelse(strength >= 20,log(strength),0)) %>%
+  mutate(node_size = ifelse(degree_c >= 20,log(degree_c),0)) %>%
   ggraph(layout = "nicely") +
   geom_edge_fan(alpha = 0.25) +
   geom_node_point(aes(color = as.factor(community),size = node_size)) + 
@@ -354,6 +354,22 @@ windowsFonts()
 names(wf[wf=="TT Courier New"])
 ```
 
+```{r}
+product_net <- read.csv("data_input/product_net.csv",fileEncoding="UTF-8-BOM")
+rownames(product_net) <- product_net[,1]
+product_net[,1] <- NULL
+
+product_net <- product_net %>% rename("" = ï..)
+product_net <- as.matrix(product_net)
+dum_net <- graph_from_adjacency_matrix(product_net,mode = "undirected",diag = F)
+
+ggg <- graph.adjacency(product_net)
+
+dummnet <- get.edgelist(ggg) %>% as.data.frame() %>% setNames(c("from","to"))
+write.csv(dummnet,"product_dum_net.csv",row.names = F```
+
+
+```
 
 To do next:
 - find account that not included in algo_friend v

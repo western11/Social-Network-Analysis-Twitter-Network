@@ -33,18 +33,18 @@ Welcome to my first internal training. In this markdown, we will learn about `So
 
 # Background {.tabset}
 ## Introduction
-**What is Social Network Analysis (SNA)**
+**What is Social Network Analysis (SNA)**    
 A social network is a structure composed of a set of actors, some of which are connected by a set of one or more relations. *Social network analysis* work at describing underlying patterns of social structure, explaining the impact of such patterns in behaviour and attitudes. Social network analysis has 4 main types of network metrics, namely:     
    
-- Network Models   
-- Key Players   
-- Tie Strength   
-- Network Cohesion   
+- Network Models: Describe how to model the relationship between users   
+- Key Players: To identify the most influential users in the network based on different context     
+- Tie Strength: To measure the strength of user's relationship   
+- Network Cohesion: To measure how cohesive entities in the networks towards network behavior.   
 
-**So What? Why do we need them?**
+**So What? Why do we need them?**   
 Humans are social beings. Even when you sleep, you're still connected to everyone in the world by your smartphone. Your smartphone keep sending and receive information like weather information, incoming whatsapp messages, late night One Piece update, and social media notification from your favourite bias. We're always connected and there's network everywhere. Somehow, some smart dudes behind the famous [Small World Theory](https://en.wikipedia.org/wiki/Small-world_network) found something from the network that quite exciting.
 
-Did you know you only [seperates by six step](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favourite person in the world? We are able to quantify what-so-called network and can be implemented in many fields. In this study we'll  only focus on two subject, Network Models and Key Players. Here's some implementation of SNA to enlight your knowledge about SNA a bit: (will put reference links later)
+Did you know you only [seperates by six step](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favourite person in the world? We are able to quantify what-so-called network and can be implemented in many fields. In this study we'll only focus on identify network metrics with `key player` as the expected output (see the 4 main types of network metrics above). Here's some implementation of SNA to enlight your knowledge about SNA a bit: (will put reference links later)
 
 - Business:   
   + Social media segmentation   
@@ -84,7 +84,7 @@ We'll crawl Twitter data using Twitter's rest API. Thus, we need authentication 
 
 Good news! recent update of `rtweet` allows you to interact with Twitter API without create your own Twitter developer account. But it's better if you have one because it gives you more stability and permissions. If you need further explanation, you can head over rtweet’s official website [here](https://rtweet.info/).
 
-In this study, we'll crawl Twitter data without using access token as crendentials. but if things are going bad, i provide some access token we can use to crawl the data. **Note** Due to rate limit, and most of use will use it at the same time, please use the token wisely.
+In this study, we'll crawl Twitter data without using access token as crendentials. but if things are going bad, i provide some access token we can use to crawl the data. **Note:** Due to rate limit, and most of use will use it at the same time, please use the token wisely.
 
 ```{r, eval=FALSE}
 apikey <- "A5csjkdrS2xxxxxxxxxxx"
@@ -98,19 +98,32 @@ token <- create_token(app = "Automated Twitter SNA",
                       access_token = acctoken,
                       access_secret = tokensecret)
 
+apikey2 <- "rt6vxwIOErhMIA7niQIVccHYe"
+apisecret2 <- "J16s0Tz9WR9MS8kVETww56apU9eYFJSsD8O94PnA0441IPnVGT"
+acctoken2 <- "1149867938477797376-TZNBrUq5UVDQf0YEygKe9Aw5AUvdrI"
+tokensecret2 <- "Z0ZsZ1yyaBJblVc2n9WHdBtymfcfLjbrVD4zhA2QJ9fNf"
+
+token2 <- create_token(app = "Twitter Network Identification",
+                      consumer_key = apikey2,
+                      consumer_secret = apisecret2,
+                      access_token = acctoken2,
+                      access_secret = tokensecret2)
+
 ```
 
 ```{r}
-# Note: Only run this code if you cant crawl the data without using any access token
-mytoken_1 <- readRDS("token_1.rds")
-#mytoken_2 <- readRDS("token_2.rds") # will add later
+# Note: Only run one this code if you cant crawl the data without using any access token
+mytoken_1 <- readRDS("data_input/token_1.rds")
+
+#mytoken_2 <- readRDS("data_input/token_2.rds")
 
 # check if the token is active
 get_token()
 ```
 
 ## Case Objectives
-In this study, we try to solve this 3 cases:
+In this study, we try to solve this 3 cases:   
+   
 - Analyze **Ego Network** from @TeamAlgoritma Twitter account   
   + Visualize top cluster from TeamAlgoritma mutual account   
   + find out which account has the potential to spread information widely   
@@ -125,11 +138,436 @@ In this study, we try to solve this 3 cases:
   + Calculate the metrics, and find out who is the `key player` in the whole conversation network   
   
 # Case 1: TeamAlgoritma Ego Network
+Ego network is just a simply The concept indicates the amount of all the nodes (here, destinations) to which an ego/node is directly connected and includes all of the ties among nodes in a network. You take any random username/company/person you want to analyze, gather all their neighborhood, and analyze it. sometimes you'll find interesting pattern like this person has a lot of different communities and none of them are look alike, or you can also found a person who can spread information most widely around around your target-person network.
+
+Here's the step to do this case:   
+1. Gather TeamAlgoritma detail Twitter data   
+2. Gather all TeamAlgoritma followers   
+3. From the follower, filter to  active account only and gather their follower and following   
+4. Create Mutual data from following and follower data   
+5. Build communities, Calculate SNA metrics, and identify which user is important   
+6. Visualize the ego network   
+
+![Picture 1: Ego network ](assets/ego_network.png)
+
+## Gather @TeamAlgoritma data
+```{r}
+algo <- lookup_users("teamalgoritma")
+algo
+```
+
+## Gather TeamAlgoritma followers
+
+```{r}
+# get teamalgoritma followers
+folower <- get_followers("teamalgoritma",n = algo$followers_count,retryonratelimit = T)
+
+# get the detail from algoritma follower lists
+detail_folower <- lookup_users(folower$user_id)
+detail_folower <- data.frame(lapply(detail_folower,as.character),stringsAsFactors = F)
+
+detail_folower %>% arrange(-as.numeric(followers_count)) %>% 
+  select(screen_name,followers_count, friends_count, favourites_count)
+```
+
+TeamAlgoritma Twitter account has 342 followers (on 15 May 2020). We need to gather all of their follower and following but Twitter rest API has (kinda stingy) limitation.
+```{r}
+rate_limit()
+```
+We can only gather 15 users (both following and follower) and 5k retrieved for every 15 minutes, so you can imagine if we want to retrieve thousand of them.. In order to minimize the time consumption, we need to filter the users to the active users only. The criteria of 'active users' is depend on your data. You need to lookup which kind of users your follower is and build your own criteria. In this case, the top 8 of Algoritma's follower is a media account. Account like 'btekno' and 'machinelearnflx' only repost link to their own media and never retweet other account tweets. So if our goal is to map the potential information spreading around TeamAlgoritma ego network, we need to exclude them for that reason.    
+
+After a long inspection, i propose several criteria for filtering active account: `Followers_count` > 100 and < 6000, `following_count` > 75, `favourites_count` > 10, and create a `new twit` at least 2 months ago. I also want to exclude protected account because we actually cant do anything about it, we can't gather their folloing and followers.
+
+```{r}
+active_fol <- detail_folower %>% 
+  select(user_id,screen_name,created_at,followers_count,friends_count,favourites_count) %>%
+  mutate(created_at = ymd_hms(created_at),
+         followers_count = as.numeric(followers_count),
+         friends_count = as.numeric(friends_count),
+         favourites_count = as.numeric(favourites_count)) %>%
+  filter((followers_count > 100 & followers_count < 6000), friends_count > 75, favourites_count > 10, 
+         created_at > "2020-03-15") %>%
+  arrange(-followers_count)
+```
 
 
+## Gather TeamAlgoritma follower's follower
+I build a loop function to gather follower from a list. Actually, we also can gather the follower with this simple code
+```{r, eval=FALSE}
+get_followers(active_fol$screen_name, n = "all",
+              retryonratelimit = T)
+```
+
+But we want to minimize the total user we want to retrieve (`n` parameter). i build a simple function to retrieve half of the followers if they have more than 1500 followers, and 75% followers if they have less than 1500
+```{r}
+flt_n <- function(x){
+  if(x > 1500){
+    x*0.5
+  }else{x*0.75}
+}
+```
+We also want to avoid SSL/TLS bug while we gather the followers. Sometimes when you reach the rate limit, the loop tend to crash and stop running. To avoid that, i order the loop to sleep every 5 gathered account (it's not always solve the problem, but it way much better)
+
+```{r, eval=FALSE}
+# Create empty list and name it after their screen name
+foler <- vector(mode = 'list', length = length(active_fol$screen_name))
+names(foler) <- active_fol$screen_name
+
+# 
+for (i in seq_along(active_fol$screen_name)) {
+  message("Getting followers for user #", i, "/130")
+  foler[[i]] <- get_followers(active_fol$screen_name[i], 
+                                  n = round(flt_n(active_fol$followers_count[i])), 
+                                retryonratelimit = TRUE)
+  
+  if(i %% 5 == 0){
+    message("sleep for 5 minutes")
+    Sys.sleep(5*60)
+    } 
+}
+
+```
+
+After gathering, bind the list to dataframe, convert the username to user_id ny left_join from active_fol data, and build clean data frame without NA
+```{r, eval=FALSE}
+# convert list to dataframe
+folerx <- bind_rows(foler, .id = "screen_name")
+active_fol_x <- active_fol %>% select(user_id,screen_name)
+
+# left join to convert screen_name into its user id
+foler_join <- left_join(folerx, active_fol_x, by="screen_name")
+
+# subset to new dataframe with new column name and delete NA
+algo_follower <- foler_join %>% select(user_id.x,user_id.y) %>%
+  setNames(c("follower","active_user")) %>% 
+  na.omit()
+```
+
+The loop need a looong time to be done. To speed up our progress, i already gather the followers and we'll use it for analysis.
+
+```{r}
+algo_follower_df <- read.csv("data_input/follower_algo.csv") 
+```
+
+## Gather TeamAlgoritma follower's following
+Same like beofre, we build loop function to gather the following. in `rtweet` package, following is also called as `friend`.
+```{r}
+active_fol %>% arrange(-friends_count)
+```
+As you can see, friends_count is way more higher than followers_count. Thus, we need to specify how many user we want to retrieve (`n` parameter). We want to minimze it, i change `flt_n` function to gather only 40% if they have more than 2k following, and 65% if less than 2k.
+
+```{r}
+flt_n_2 <- function(x){
+  if(x > 2000){
+    x*0.4
+  }else{x*0.65}
+}
+```
+
+The loop is also a bit different. instead of list, we store the data to dataframe. `get_friends()` function gives 2 column as their output; friend list and the querry. we can easily just row bind them.
+```{r, eval=FALSE}
+friend <- data.frame()
+
+for (i in seq_along(active_fol$screen_name)) {
+  message("Getting followers for user #", i, "/161")
+  kk <- get_friends(active_fol$screen_name[i],
+                        n = round(flt_n_2(active_fol$friends_count[i])),
+                        retryonratelimit = TRUE)
+  
+  friend <- rbind(friend,kk)
+  
+  if(i %% 5 == 0){
+    message("sleep for 5 minutes")
+    Sys.sleep(5*60)
+    } 
+}
+
+```
+
+```{r, eval=FALSE}
+all_friend <- friend %>% setNames(c("screen_name","user_id"))
+all_friendx <- left_join(all_friend, active_fol_x, by="screen_name")
+
+algo_friend <- all_friendx %>% select(user_id.x,user_id.y) %>%
+  setNames(c("following","active_user"))
+```
+
+This loop are also take a long time to run. Again, to speed up our progress, we will use following data i already gathered.
+
+```{r}
+algo_friend_df <- read.csv("data_input/following_algo.csv")
+
+```
+
+We need to make sure all unique active user in algo_friend is availiable in algo_following and vice versa
+```{r}
+algo_friend_df %>% filter(!active_user %in% algo_follower_df$active_user)
+```
+
+## Create Mutual dataframe
+Now we have both following and follower data. We need to build 'mutual' data to make sure the network is a strong two-side-connection network. Mutual is my terms of people who follow each other. we can found that by: split algo_friend data by every unique active_user, then we find every account in following column that also appear in algo_follower$follower. The presence in both column indicates the user are following each other
+
+```{r}
+# collect unique user_id in algo_friend df
+un_active <- unique(algo_friend_df$active_user) %>% data.frame(stringsAsFactors = F) %>%
+  setNames("user")
+
+# create empty dataframe
+algo_mutual <- data.frame()
+
+# loop function to filter the df by selected unique user, then find user that presence 
+# in both algo_friend$following and algo_follower$follower column
+# set column name, and store it to algo_mutual df
+
+for (i in seq_along(un_active$user)){
+  aa <- algo_friend_df %>% filter(active_user == un_active$user[i])
+  bb <- aa %>% filter(aa$following %in% algo_follower_df$follower) %>%
+    setNames(c("mutual","active_user"))
+  
+  algo_mutual <- rbind(algo_mutual,bb)
+}
+
+```
+
+```{r}
+algo_mutual
+```
+
+phew we finisihed data gathering step! next we'll jump into SNA process
+
+## Build nodes, edges, and graph dataframe
+A network consists of nodes and edges. nodes (also called as vertices) indicates every unique object in network and edges is a relation between nodes (object). We'll build nodes dataframe from every unique account in algo_mutual df. and edges dataframe that contains pair of accounts, we can use algo_mutual df for that.
+
+```{r}
+nodes <- data.frame(V = unique(c(algo_mutual$mutual,algo_mutual$active_user)),
+                    stringsAsFactors = F)
+```
+
+```{r}
+edges <- algo_mutual %>% setNames(c("from","to"))
+
+```
+
+after that, we can simply create graph dataframe using `graph_from_data_frame` function from `igraph` package.
+```{r}
+network_ego1 <- graph_from_data_frame(d = edges, vertices = nodes, directed = F) %>%
+  as_tbl_graph()
+```
+
+## Build communities and calculate metrics
+I need to remind you we'll do the analysis using `tidygraph` style. There are lots different code style to build a network but i found `tidygraph` package is the easiest. `tidygraph` are just wrappers for `igraph` packages.
+
+`igraph` code example:
+```{r, eval=FALSE}
+# build communities and its member from graph
+cw <- cluster_walktrap(network_ego1)
+member <- data.frame(v = 1:vcount(network_ego1), member = as.numeric(membership(cw)))
+
+# measure betweenness centrality using igraph
+V(network_ego1)$betwenness <- betweenness(network_ego1, v = V(network_ego),directed = F)
+```
+
+Create communities using `group_walktrap()` algorithm, and calculate lots of metrics using `tidygraph` style 
+```{r}
+network_ego1 <- network_ego1 %>% 
+  mutate(community = as.factor(group_walktrap())) %>%
+  mutate(degree_c = centrality_degree()) %>%
+  mutate(betweenness_c = centrality_betweenness(directed = F,normalized = T)) %>%
+  mutate(closeness_c = centrality_closeness(normalized = T)) %>%
+  mutate(eigen = centrality_eigen(directed = F))
+
+network_ego1
+```
+ 
+We can easily convert it to dataframe using `as.data.frame()` function. We need to this to specify who is the `key player` in TeamAlgoritma ego network
+```{r}
+network_ego_df <- as.data.frame(network_ego1)
+network_ego_df
+```
 
 
+## Graph Metrics
+Before we make a conclusion from the table above, let's take a time to learn what's the idea behind those metrics. We'll build network from Algoritma Product Team as dummy network to make the explanation easier, and just to inform you how SNA works in real case
+```{r}
+product_df <- read.csv("data_input/product_dum_net.csv",stringsAsFactors = F)
 
+nodes_dum <- data.frame(V = unique(c(product_df$from,product_df$to)),
+                        stringsAsFactors = F)
+
+edge_dum <- product_df
+
+product_net <- graph_from_data_frame(d = edge_dum, vertices = nodes_dum, directed = F) %>%
+  as_tbl_graph()
+
+
+```
+```{r message=FALSE,warning=FALSE}
+library(extrafont)
+loadfonts(device = "win")
+# windowsFonts()
+```
+
+### Degree Centrality   
+The easiest centrality among them all. Its just **how many ties that a node has**. A connection between nodes are seperated by 2 types: [Directed and Undirected](https://www.mathworks.com/help/matlab/math/directed-and-undirected-graphs.html). Directed is a relationship between nodes that the edges has direction. Undirected indicates two-way relationship, it doesnt has any direction. Directed network also separated in 2 type based on its direction, namely: indegree and outdegree. The calculation for directed and undirected are kinda different but it have a same idea: how many nodes is connected to a node. 
+
+
+```{r}
+product_net %>% 
+  mutate(degree = centrality_degree()) %>%
+  ggraph(layout = "fr") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(size = degree,color = degree)) +
+  geom_node_text(aes(size = degree,label = name),
+                 repel = T,show.legend = F) +
+  scale_color_continuous(guide = "legend") +
+  theme_graph() + labs(title = "Product Team Network",
+                       subtitle = "Based on Degree Centrality")
+
+```
+
+```{r}
+# Tiara network neighbors
+g_ti <- induced.subgraph(product_net, c(2, neighbors(product_net,2)))
+g_ti %>% plot(edge.arrow.size = 0,layout = layout.star(g_ti,center = V(g_ti)[2]))
+```
+
+
+### Closeness centrality
+The closeness centrality of a node is the **average length of the shortest path** between the node and all other nodes in the graph. Thus the more central a node is, the closer it is to all other nodes.
+$$C(i) = \frac{N-1}{\sum_{j}d(j,i)}$$
+$d(j,i)$ is the distance between vertices $j$ and $i$. This centrality divide total number of nodes minus 1($N-1$) by total number of every shorthest path between one node to every node in the graph.
+
+```{r}
+product_net %>% 
+  mutate(closeness = centrality_closeness()) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(size = closeness,color = closeness)) +
+  geom_node_text(aes(size = closeness, label = name),
+                 repel = T, show.legend = F) +
+  scale_color_continuous(guide = "legend") +
+  theme_graph() + labs(title = "Product Team Network",
+                       subtitle = "Based on Closeness Centrality")
+
+```
+
+### Betweenness centrality
+Betweenness centrality quantifies the number of times a node acts as a bridge along the shortest path between two other nodes/groups.  
+$$C_{B}(v) = \sum_{ij}\frac{\sigma_{ij}(v)}{\sigma_{ij}}$$
+Where $\sigma_{ij}$ is total number of shortest paths from node $x$ to node $y$ and $\sigma_{ij}(v)$ is the number of those paths that pass through $v$ 
+
+```{r}
+product_net %>% 
+  mutate(betweenness = centrality_betweenness()) %>%
+  ggraph(layout = "kk") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(size = betweenness,color = betweenness)) +
+  geom_node_text(aes(size = betweenness, label = name),
+                 repel = T, show.legend = F) +
+  scale_color_continuous(guide = "legend") +
+  theme_graph() + labs(title = "Product Team Network", 
+                       subtitle = "Based on Betweenness Centrality")
+
+```
+
+### Eigenvector centrality
+Eigenvector centrality is a measure of the influence of a node in a network. The relative score that are assigned to the nodes in the network are based on the concept that **connections to high-scoring contributes more to the score** of the node in question than equal connections to low-scoring nodes. This amazing [link](http://matrixcalc.org/en/vectors.html) will help you with the calculation.
+
+if $A$ is the adjency matrix of a graph and $\lambda$ is the largest eigenvalue of $A$ and $x$ is the corresponding eigenvector then $Ax = \lambda x$. it can be transformed to $x = \frac{1}{\lambda}Ax$. where $Ax$ can be defined $\sum_{j=1}^{N}A_{i,j}x_{j}$ therefore:
+$$C_{E}(i) = x_{i} = \frac{1}{\lambda}\sum_{j=1}^{N}A_{i,j}x_{j}$$
+
+
+```{r}
+product_net %>% 
+  mutate(eigen = centrality_eigen()) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(size = eigen,color = eigen)) +
+  geom_node_text(aes(size = eigen, label = name),
+                 repel = T, show.legend = F) +
+  scale_color_continuous(guide = "legend") +
+  theme_graph() + labs(title = "Product Team Network",
+                       subtitle = "Based on Eigenvector Centrality")
+
+```
+
+### Community and Modularity
+Building community in graph theory is a bit different than clustering in machine learning.`igraph` package implements a number of community detection methods, community structure detection algorithms try to find dense subgraphs in directed or undirected graphs, by optimizing some criteria, and usually using heuristics. Community detection algorithm like `group_walktrap()`, `group_fast_greedy()`, and `group_louvain()` has their own way to create communities in the network. One of the common use community detection algorithm is `group_walktrap()`. This function tries to find densely connected subgraphs, also called communities in a graph via random walks. The idea is that short random walks tend to stay in the same community. 
+
+Modularity in the other hand, is a measure of how good the division is, or **how separated are the different vertex types from each other**
+$$Q = \frac{1}{2m}\sum_{ij}(A_{ij}-\frac{k_{i}k_{j}}{2m})\delta(c_{i},c_{j})$$
+here $m$ is the number of edges, $A_{ij}$ is the element of the $A$ adjacency matrix in row $i$ and column $j$, $k_{i}$ is the degree of $i$, $k_{j}$ is the degree of $j$, $c_{i}$ is the type (or component) of $i$, $c_{j}$ that of $j$, and $\delta(c_{i},c_{j})$ is the Kronecker delta, which returns 1 if the operands are equal and 0 otherwise. In summary, **networks with high modularity have dense connections between the nodes within community but sparse connections between nodes in different community**
+
+```{r}
+product_net %>% 
+  mutate(community = group_walktrap()) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(color = factor(community)),size = 5) +
+  geom_node_text(aes(label = name),repel = T) +
+  theme_graph() + theme(legend.position = "none") +
+  labs(title = "Product Team Network", subtitle = "Seperated by cluster")
+```
+Now let's check if this network has high or low modularity score
+```{r}
+# first build communities using any cluster detection algorithm
+cw_net <- igraph::cluster_walktrap(product_net)
+modularity(cw_net)
+```
+low modularity score indicates the community in the network actually don't have much difference. There are dense connections between nodes in both community. The community member might be different depends on what algorithm you use. you can try different algorithm and compare them using `compare()` function. By default, `compare()` returns a score by its Variance Information (method = "vi), which counts whether or not any two vertices are members of the same community. A lower score means that the two community structures are more similar 
+
+```{r}
+sp_net <- cluster_spinglass(product_net)
+compare(comm1 = cw_net,comm2 = sp_net,method = "vi")
+```
+
+
+## Identify prominent user in the network
+So at this point, i hope you understand the concept of graph, nodes & edges, centrality, community & modularity and how to use it. We will move back to our Twitter network. We alredy convert the table_graph to data frame. Last thing we need to do is to find top account in each centrality and pull the key player
+```{r}
+network_ego_df
+```
+
+Key player is a terms for the most influential users in the network based on different context. 'Different context' in this case is different centrality metrics. Each centrality have different use and intepretation, user that appear in the top of most centrality will be considered as the key player of the whole network.
+
+```{r}
+kp_ego <- data.frame(
+  network_ego_df %>% arrange(-degree_c) %>% select(name) %>% slice(1:5),
+  network_ego_df %>% arrange(-betweenness_c) %>% select(name) %>% slice(1:5),
+  network_ego_df %>% arrange(-closeness_c) %>% select(name) %>% slice(1:5),
+  network_ego_df %>% arrange(-eigen) %>% select(name) %>% slice(1:5)
+) %>% setNames(c("degree","betweenness","closeness","eigen"))
+
+kp_ego
+```
+
+From the table above, account "1049333510505291778" appear in most centrality. That account has the most degree in the network (high degree) but also surrounded by important person (high eigenvector). Thus, we can conclude that user "1049333510505291778" is the key player of TeamAlgoritma Twitter ego network.
+
+Let's see who he/she is:
+```{r}
+key_player_ego <- lookup_users("1049333510505291778")
+key_player_ego
+```
+
+## Visualize Network
+Let's try visualize the network. I'll scale the nodes by eigenvector, and color it by community. since our network is too large (approximately 14k nodes and 15k edges), i'll filter by only showing community 1 - 3. 
+
+```{r}
+network_ego1 %>%
+  filter(community %in% 1:3) %>%
+  mutate(node_size = ifelse(degree_c >= 20,log(degree_c),0)) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(color = as.factor(community),size = node_size)) +
+  theme_graph() + theme(legend.position = "none") +
+  labs(title = "TeamAlgoritma Mutual Communities",
+       subtitle = "Top 3 Community")
+
+```
+
+# Case 2: Activity Network: "indonesiaterserah"
+
+Will add more soon :))
 
 
 
