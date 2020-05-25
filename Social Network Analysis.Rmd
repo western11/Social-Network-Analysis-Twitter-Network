@@ -29,7 +29,7 @@ Welcome to my first internal training. In this markdown, we will learn about `So
 
 **Note:** In 28 March 2019, Kak Eca already deliver a cool internal training about Twitter Interactions using `Twinetverse` <will input the link later>. It has similar idea with this study, we both explain about building network from Twitter data. The difference in this study is we're not only make visualization, but also calculate metrics to achieve the goals for every case (spoiler: we'll do 3 SNA cases). We'll also more focus to how to implement SNA and what it is. This study is theory-driven studies.
 
-<mind map>
+![](assets/mindmap.png)
 
 # Background {.tabset}
 ## Introduction
@@ -98,10 +98,10 @@ token <- create_token(app = "Automated Twitter SNA",
                       access_token = acctoken,
                       access_secret = tokensecret)
 
-apikey2 <- "rt6vxwIOErhMIA7niQIVccHYe"
-apisecret2 <- "J16s0Tz9WR9MS8kVETww56apU9eYFJSsD8O94PnA0441IPnVGT"
-acctoken2 <- "1149867938477797376-TZNBrUq5UVDQf0YEygKe9Aw5AUvdrI"
-tokensecret2 <- "Z0ZsZ1yyaBJblVc2n9WHdBtymfcfLjbrVD4zhA2QJ9fNf"
+apikey2 <- "rt6vxwIOErhMIAxxxxxxxxxxxxxx"
+apisecret2 <- "J16s0Tz9WR9MS8kVETww56apU9exxxxxxxxxxxxxxx"
+acctoken2 <- "1149867938477797376-TZNBxxxxxxxxxxxxxxxxxxxxxx"
+tokensecret2 <- "Z0ZsZ1yyaBJblVc2n9WHxxxxxxxxxxxxxxxxxxxxxxx"
 
 token2 <- create_token(app = "Twitter Network Identification",
                       consumer_key = apikey2,
@@ -503,7 +503,7 @@ product_net %>%
   mutate(community = group_walktrap()) %>%
   ggraph(layout = "nicely") +
   geom_edge_fan(alpha = 0.25) +
-  geom_node_point(aes(color = factor(community)),size = 5) +
+  geom_node_point(aes(color = factor(community)),size = 5, show.legend = F) +
   geom_node_text(aes(label = name),repel = T) +
   theme_graph() + theme(legend.position = "none") +
   labs(title = "Product Team Network", subtitle = "Seperated by cluster")
@@ -565,9 +565,20 @@ network_ego1 %>%
 
 ```
 
-# Case 2: Activity Network: "indonesiaterserah"
+# Reference
+**SNA with R:**   
+- [Rtweet homepage](https://rtweet.info/)   
+- [Tidygraph introduction](https://www.data-imaginist.com/2017/introducing-tidygraph/)   
+- [R Twitter network example (my main reference)](https://perrystephenson.me/2018/09/29/the-r-twitter-network/)   
+- [Various R packages for SNA](https://www.jessesadler.com/post/network-analysis-with-r/)   
+- [igraph manual pages](https://igraph.org/r/doc/)   
+- [R-graph gallery](https://www.r-graph-gallery.com/network.html)   
 
-Will add more soon :))
+**Interesting use case:**   
+- [SNA in crisis situation (Terrorist attack)](https://www.researchgate.net/publication/338943208_Crisis_Communication_on_Twitter_A_Social_Network_Analysis_of_Christchurch_Terrorist_Attack_in_2019)   
+- will add more
+
+
 
 
 

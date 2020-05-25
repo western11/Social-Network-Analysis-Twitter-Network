@@ -10,8 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r message=FALSE,warning=FALSE}
-library(dplyr) #for data wrangling. very helpfull for preparing nodes and edges data
-library(data.table)
+library(tidyverse) #for data wrangling. very helpfull for preparing nodes and edges data
 library(lubridate)
 #library(network)
 library(igraph)
@@ -359,14 +358,14 @@ product_net <- read.csv("data_input/product_net.csv",fileEncoding="UTF-8-BOM")
 rownames(product_net) <- product_net[,1]
 product_net[,1] <- NULL
 
-product_net <- product_net %>% rename("" = ï..)
+
 product_net <- as.matrix(product_net)
 dum_net <- graph_from_adjacency_matrix(product_net,mode = "undirected",diag = F)
 
 ggg <- graph.adjacency(product_net)
 
 dummnet <- get.edgelist(ggg) %>% as.data.frame() %>% setNames(c("from","to"))
-write.csv(dummnet,"product_dum_net.csv",row.names = F```
+write.csv(dummnet,"product_dum_net.csv",row.names = F)
 
 
 ```
@@ -376,3 +375,318 @@ To do next:
 - subset account that not following "943736953274482688" in algo_friend v
 - filter account yang saling follow"an dari algo_friend dan algo_follower v
 - build ego network
+
+
+```{r}
+get_trends("Jakarta")
+```
+
+## Twitter Activity Network 2nd attempt
+
+```{r}
+eid <- search_tweets("#BersiapMenujuNewNormal",n = 18000,include_rts = T,retryonratelimit = T)
+
+eid_df <- data.frame(lapply(ind,as.character),stringsAsFactors = F)
+
+```
+
+```{r}
+edge_eid <- eid_df %>% select(created_at,screen_name,is_retweet,mentions_screen_name) %>%
+  mutate(mentions_screen_name = sapply(mentions_screen_name,mention_clean)) %>% na.omit()
+
+edge_eid <- edge_eid %>% 
+  mutate(type = ifelse(is_retweet == "TRUE","retweet","mention"))
+
+edge_eid <- edge_eid %>% select(screen_name,mentions_screen_name,type) %>%
+  separate_rows(mentions_screen_name,sep = ",") %>% 
+  setNames(c("from","to","type")) %>% count(from,to,type)
+
+
+nodes_eid <- data.frame(V = unique(c(edge_eid$from,edge_eid$to)),
+                        stringsAsFactors = F)
+
+network_eid <- graph_from_data_frame(d = edge_eid, vertices = nodes_eid, directed = T) %>%
+  as_tbl_graph()
+
+network_eid <- network_eid %>% 
+  activate(nodes) %>%
+  mutate(community = group_walktrap(),
+         degree = centrality_degree()) %>%
+  activate(edges) %>%
+  filter(!edge_is_loop())
+
+```
+
+```{r}
+network_eid %>% 
+  activate(nodes) %>%
+  mutate(node_label = ifelse(degree >= 25,name,"")) %>%
+  ggraph(layout = "kk") +
+  geom_edge_arc(alpha = 0.05,aes(col = as.factor(type))) +
+  geom_node_text(aes(label = node_label), repel = T,
+                 color = "black", fontface = "bold") +
+  theme_graph() + theme(legend.position = "bottom")
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Twitter Activity network
+
+```{r}
+ind <- search_tweets("#IndonesiaTerserah",n = 18000,include_rts = F,retryonratelimit = T)
+
+indrt <- search_tweets("#IndonesiaTerserah",n = 18000,include_rts = T,retryonratelimit = T,)
+indrt_2 <- search_tweets("#IndonesiaTerserah",n = 18000,
+                       include_rts = T,retryonratelimit = T,max_id = "1262618117730996224")
+indrt_3 <- search_tweets("#IndonesiaTerserah",n = 18000,
+                       include_rts = T,retryonratelimit = T,max_id = "1262260453104893954")
+indrt_4 <- search_tweets("#IndonesiaTerserah",n = 18000,
+                       include_rts = T,retryonratelimit = T,max_id = "1261875641659437058")
+
+rl <- rate_limit()
+
+rl[,2] == rl[,3]
+rl[170,]
+
+head(ind_df)
+ind_df <- data.frame(lapply(ind,as.character),stringsAsFactors = F)
+
+ind_df %>% arrange(as.numeric(retweet_count))
+
+sum(as.numeric(ind_df$retweet_count))
+
+table(as.factor(ind_df$is_retweet))
+
+dumrt <- rtweet::get_retweeters(status_id = "1262309040237002752",n = 100)
+
+indrt_3 %>% arrange(as.numeric(status_id))
+range(indrt_2$created_at)
+
+ind_all <- rbind(indrt,indrt_2,indrt_3)
+ind_all <- data.frame(lapply(ind_all,as.character),stringsAsFactors = F)
+
+scd_trd <- get_trends("Indonesia")
+
+head(ind_all)
+
+ind_all %>% filter(is_retweet == "TRUE")
+```
+
+```{r}
+ind_rt <- ind_all %>% filter(is_retweet == "TRUE") %>%
+  select(c(user_id,status_id,created_at,screen_name,retweet_count,retweet_status_id,retweet_screen_name))
+
+ind_rt %>% arrange(-as.numeric(retweet_count))
+```
+
+```{r}
+edges_act <- ind_rt %>% select(screen_name,retweet_screen_name,retweet_count) %>% 
+  setNames(c("from","to","n"))
+edges_act <- edges_act %>% mutate(type = rep("retweet"))
+
+nodes_act <- data.frame(V = unique(c(edges_act$from,edges_act$to)),
+                        stringsAsFactors = F)
+
+network_act1 <- graph_from_data_frame(d = edges_act, vertices = nodes_act, directed = F) %>%
+  as_tbl_graph()
+```
+
+
+```{r}
+ind_mt <- ind_all %>% filter(is_retweet == "FALSE") %>%
+  select(c(user_id,status_id,created_at,screen_name,mentions_screen_name))
+```
+
+```{r}
+mention_clean <- function(x){
+  if(grepl(",",x) == TRUE){
+    gsub('^.|[^[:alnum:][:blank:]_,?&/\\-]',"",x)
+  } else{
+    x
+  }
+}
+```
+
+```{r}
+ind_mt$mentions_screen_name <- sapply(ind_mt$mentions_screen_name,mention_clean)
+
+edges_mt <- ind_mt %>% select(screen_name,mentions_screen_name) %>%
+  na.omit() %>% separate_rows(mentions_screen_name,sep = ",") %>%
+  setNames(c("from","to"))
+edges_mt <- edges_mt %>% count(from,to) %>% mutate(type = rep("mention"))
+
+nodes_mt <- data.frame(V = unique(c(edges_mt$from,edges_mt$to)),
+                        stringsAsFactors = F)
+
+network_mt1 <- graph_from_data_frame(d = edges_mt, vertices = nodes_mt, directed = F) %>%
+  as_tbl_graph()
+```
+
+```{r}
+nodes_actx <- rbind(nodes_act,nodes_mt) %>% distinct()
+edges_actx <- rbind(edges_act,edges_mt)
+
+network_actx <- graph_from_data_frame(d = edges_actx, vertices = nodes_actx, directed = T) %>%
+  as_tbl_graph()
+
+```
+```{r}
+network_actx <- network_actx %>%
+  activate(nodes) %>%
+  mutate(community = as.factor(group_walktrap()),
+         degree = centrality_degree())
+
+network_actx %>% activate(nodes) %>% arrange(-degree)
+```
+
+```{r}
+network_actx %>% 
+  activate(edges) %>%
+  filter(!edge_is_loop()) %>%
+  activate(nodes) %>%
+  filter(community %in% 1:5) %>%
+  top_n(50,degree) %>%
+  mutate(node_label = ifelse(degree >= 30,name,"")) %>%
+  ggraph(layout = "kk") +
+  geom_edge_fan(aes(col  = type), alpha = 0.25) +
+  geom_node_point(aes(col = community),show.legend = F)+
+  geom_node_text(aes(label = node_label),repel = T,
+                 show.legend = F, fontface = "bold") +
+  theme_graph() + theme(legend.position = "bottom")
+```
+
+
+```{r}
+network_act1 <- network_act1 %>%
+  activate(nodes) %>% 
+  mutate(weight = centrality_degree()) %>%
+  arrange(-weight) %>%
+  activate(edges) %>%
+  mutate(type = rep("retweet"))
+
+
+network_act1 %>% activate(nodes) %>% arrange(-weight)
+
+network_act1 %>%
+  activate(nodes) %>%
+  mutate(community = as.factor(group_walktrap())) %>%
+  mutate(id = row_number()) %>% 
+  filter(community %in% 1:3) %>%
+  top_n(1000,weight) %>%
+  mutate(nodes_size = ifelse(weight >= 300, log(weight),0)) %>%
+  mutate(nodes_label = ifelse(weight >= 300, name,"")) %>%
+  ggraph(layout = "linear",circular = T, sort.by = "id") +  
+  geom_edge_fan(alpha = 0.25) +
+  geom_node_point(aes(size = nodes_size)) +
+  geom_node_text(aes(label = nodes_label, size = nodes_size,col = community), 
+                 repel = T,show.legend = F,fontface = "bold",
+                 segment.colour = "slateblue") +
+  theme_graph() + theme(legend.position = "none")
+  
+
+network_act1 %>%
+  activate(nodes) %>%
+  mutate(community = as.factor(group_walktrap())) %>%
+  top_n(50,weight) %>%
+  mutate(nodes_size = ifelse(weight >= 200, log(weight),0)) %>%
+  mutate(nodes_label = ifelse(weight >= 200, name,"")) %>%
+  ggraph(layout = "fr") +
+  geom_edge_fan() +
+  geom_node_point(aes(size = nodes_size, col = community)) +
+  geom_node_text(aes(label = nodes_label), repel = T, 
+                 show.legend = F, fontface = "bold", segment.colour = "slateblue") +
+  theme_graph() + theme(legend.position = "none")
+
+
+```
+
+```{r}
+
+```
+
+
+## rate_limit() important row:
+170 - search_tweets()
+
+
+
+```{r}
+mention_clean <- function(x){
+  if(grepl(",",x) == TRUE){
+    gsub('^.|[^[:alnum:][:blank:]_,?&/\\-]',"",x)
+  } else{
+    x
+  }
+}
+```
+
+```{r}
+filter_ind_df <- ind_df %>%
+  select(user_id,status_id,created_at,screen_name,retweet_count,mentions_screen_name,status_url) %>%
+  mutate(created_at = ymd_hms(created_at),
+         retweet_count = as.numeric(retweet_count),
+         mentions_screen_name = sapply(mentions_screen_name,mention_clean)) %>%
+  filter(retweet_count >= 30, mday(created_at) %in% 17:19) %>% arrange(-retweet_count)
+  
+  
+range(filter_ind_df$created_at)
+
+filter_ind_df %>% group_by(mday(created_at)) %>% summarise(tt=n())
+
+sum(filter_ind_df$retweet_count)
+
+
+```
+
+
+```{r}
+retweeter_id <- vector(mode = 'list', length = length(filter_ind_df$status_id))
+names(retweeter_id) <- filter_ind_df$screen_name
+
+for (i in seq_along(filter_ind_df$status_id)){
+  message("Getting RT for tweet #",i," /105")
+  retweeter_id[[i]] <- get_retweeters(filter_ind_df$status_id[i],n = 3500)
+  
+  if(i %% 50 == 0){
+    message("Sleep for 15 minutes")
+    Sys.sleep(15*60)
+  }
+}
+
+rttst <- get_retweeters(filter_ind_df$status_id[1],n = 100)
+```
+
+
+```{r}
+rt_df1 <- bind_rows(retweeter_id, .id="screen_name")
+table(rt_df1$screen_name)
+filter_ind_df$screen_name[50]
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
