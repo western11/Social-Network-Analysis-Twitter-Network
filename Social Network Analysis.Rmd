@@ -21,7 +21,7 @@ options(scipen = 999)
 
 
 **Hello!**
-Welcome to my first internal training. In this markdown, we will learn about `Social Network Analysis` using various packages especially `tidygraph` (including `igraph` and `ggraph`). We'll not only learn about the visualizing stuff but also the metrics. We'll analyze Twitter network as our study case using `rtweet` package. After this internal training, I hope we will be able to do:   
+Welcome to my first internal training. In this markdown, we will learn about `Social Network Analysis` using `tidygraph` (including `igraph` and `ggraph`). We'll not only learn about the visualizing stuff but also the metrics. We'll analyze Twitter network as our study case using `rtweet` package. After this internal training, I hope we will be able to do:   
    
 - Analyze *Ego Network* from specific account/user   
 - Analyze *Competition Network* from various similar account/industries   
@@ -64,12 +64,12 @@ Did you know you only [seperates by six step](https://en.wikipedia.org/wiki/Six_
 Let's install required library for this study.
 ```{r message=FALSE,warning=FALSE}
 # for data wrangling. very helpfull for preparing nodes and edges data
-library(dplyr) 
-library(data.table)
+library(tidyverse) 
 library(lubridate)
 
 # for building network and visualization 
 library(tidygraph)
+library(graphlayouts)
 # already included in tidygraph but just fyi
 library(igraph)
 library(ggraph)
@@ -121,24 +121,15 @@ mytoken_1 <- readRDS("data_input/token_1.rds")
 get_token()
 ```
 
-## Case Objectives
-In this study, we try to solve this 3 cases:   
-   
+ 
+# Case 1: TeamAlgoritma Ego Network
+Ego network is just a simply The concept indicates the amount of all the nodes (here, destinations) to which an ego/node is directly connected and includes all of the ties among nodes in a network. You take any random username/company/person you want to analyze, gather all their neighborhood, and analyze it. sometimes you'll find interesting pattern like this person has a lot of different communities and none of them are look alike, or you can also found a person who can spread information most widely around around your target-person network.
+
+Case objectives:
 - Analyze **Ego Network** from @TeamAlgoritma Twitter account   
   + Visualize top cluster from TeamAlgoritma mutual account   
   + find out which account has the potential to spread information widely   
   + Calculate the metrics, and find out who is the `key player` in TeamAlgoritma network   
-- Analyze **Competition Network** from @kfc_id, @mcd_id, @wendys, @phd account   
-  + Visualize the whole competition network    
-  + Identify fanbase cluster in each account   
-  + Calculate the metrics, and find out who is the `key player` in the whole network   
-- Analyze **Activity Network** given random keyword(s) or hashtag   
-  + Visualize the activity/information network   
-  + find out which cluster talk about which topic regarding the keyword   
-  + Calculate the metrics, and find out who is the `key player` in the whole conversation network   
-  
-# Case 1: TeamAlgoritma Ego Network
-Ego network is just a simply The concept indicates the amount of all the nodes (here, destinations) to which an ego/node is directly connected and includes all of the ties among nodes in a network. You take any random username/company/person you want to analyze, gather all their neighborhood, and analyze it. sometimes you'll find interesting pattern like this person has a lot of different communities and none of them are look alike, or you can also found a person who can spread information most widely around around your target-person network.
 
 Here's the step to do this case:   
 1. Gather TeamAlgoritma detail Twitter data   
@@ -556,7 +547,7 @@ Let's try visualize the network. I'll scale the nodes by eigenvector, and color 
 network_ego1 %>%
   filter(community %in% 1:3) %>%
   mutate(node_size = ifelse(degree_c >= 20,log(degree_c),0)) %>%
-  ggraph(layout = "nicely") +
+  ggraph(layout = "stress") +
   geom_edge_fan(alpha = 0.25) +
   geom_node_point(aes(color = as.factor(community),size = node_size)) +
   theme_graph() + theme(legend.position = "none") +
@@ -565,10 +556,161 @@ network_ego1 %>%
 
 ```
 
+# Additional case: Activity Network
+This section is additional. Activity network analyze how information is spread around the network. From this analysis, we can found how something goes viral and how people interact with it. Because this network contain all form of Twitter communication (even a single retweet), the visualization will most likely become a hairball. You will need a lot of data featuring or filtering for visualization purpose, but in the end it will be up to your preferences.   
+
+## Case Objective
+- Analyze **Activity Network** given random keyword(s) or hashtag   
+  + Visualize the activity/information network   
+  + find out which cluster talk about which topic regarding the keyword   
+  + Calculate the metrics, and find out who is the `key player` in the whole conversation network   
+
+Here's the step to do this case:   
+1. Gather any trending keywords or hashtag (in this case i'll use #NewNormal)   
+2. Filter the data, use tweet with lots of interaction (retweet or mention)   
+3. Specify which column is communicate with which, then create edges df   
+4. Create nodes df and the network   
+5. Build communities, Calculate SNA metrics, and identify which user is important   
+6. Visualize the network    
+
+## Gather tweets data
+You can always choose another keywords or hashtag. in this example, i'll use #NewNormal as the querry.
+```{r, eval=FALSE}
+newnorm <- search_tweets("#NewNormal",n = 18000,include_rts = T,retryonratelimit = T)
+newnorm <- data.frame(lapply(newnorm,as.character),stringsAsFactors = F)
+```
+it'll take approximately 4-5 minutes and there's a possibility of failure (sls/tls, or simply bad connection). so i provide the output in csv for us to continue the analysis.
+
+```{r}
+newnorm <- read.csv("data_input/newnormal.csv", stringsAsFactors = F)
+head(newnorm)
+```
+
+## Build edges, nodes, and graph dataframe
+mentions_screen_name column contains user screen_name we interact with. it'll be our "to" column in edges. however, by default the column is list type (that i convert to character). We need to remove unused string first. Here's a function to remove all symbols except letter, number and comma ' , '. it also remove first letter in the stirng (c in our case)
+```{r}
+mention_clean <- function(x){
+  if(grepl(",",x) == TRUE){
+    gsub('^.|[^[:alnum:][:blank:]_,?&/\\-]',"",x)
+  } else{
+    x
+  }
+}
+```
+
+then we simply apply it to the column
+```{r}
+# apply mention_clean function to mentions_screen_name column using sapply()
+edge_nn <- newnorm %>% select(screen_name,is_retweet,mentions_screen_name) %>%
+  mutate(mentions_screen_name = sapply(mentions_screen_name,mention_clean))
+
+# specify interaction type
+edge_nn <- edge_nn %>% 
+  mutate(type = ifelse(is_retweet == "TRUE","retweet","mention"))
+
+# seperate value in mention_screen_name by comma
+edge_nn <- edge_nn %>% select(screen_name,mentions_screen_name,type) %>%
+  separate_rows(mentions_screen_name,sep = ",") %>% 
+  setNames(c("from","to","type")) %>% count(from,to,type)
+
+# create nodes dataframe by unique value in both edges column
+nodes_nn <- data.frame(V = unique(c(edge_nn$from,edge_nn$to)),
+                        stringsAsFactors = F)
+
+# build graph data
+network_nn <- graph_from_data_frame(d = edge_nn, vertices = nodes_nn, directed = T) %>%
+  as_tbl_graph()
+
+# create community, calculate centrality and remove loop edge
+set.seed(123)
+network_nn <- network_nn %>% 
+  activate(nodes) %>%
+  mutate(community = group_walktrap(),
+         degree = centrality_degree(),
+         between = centrality_betweenness(),
+         closeness = centrality_closeness(),
+         eigen = centrality_eigen()) %>%
+  activate(edges) %>%
+  filter(!edge_is_loop())
+
+network_act_df <- as.data.frame(network_nn %>% activate(nodes))
+
+network_nn
+```
+
+## Identify prominent person in the network
+Key player in ego network and activity network have different intepretation. In this case, the key player will be considered as person who make this specific keyword viral. We also can identify which person whose opinions are widely agreed upon by others. 
+
+```{r}
+kp_activity <- data.frame(
+  network_act_df %>% arrange(-degree) %>% select(name) %>% slice(1:5),
+  network_act_df %>% arrange(-between) %>% select(name) %>% slice(1:5),
+  network_act_df %>% arrange(-closeness) %>% select(name) %>% slice(1:5),
+  network_act_df %>% arrange(-eigen) %>% select(name) %>% slice(1:5)
+) %>% setNames(c("degree","betweenness","closeness","eigen"))
+
+kp_activity
+```
+
+From the table above, "Timothy_Hughes" grab our attention the most. he/she appear in most centrality. Thus we can conclude he/she is the key player in #NewNormal Twitter actiity network. Let's see his tweets
+```{r}
+newnorm %>% filter(screen_name == "Timothy_Hughes") %>% arrange(-retweet_count)
+```
+
+## Visualize network
+let's try to visualize the network. the network consist 23k+ nodes and  17k+ degree. we need to filter it otherwise it'll be just hairball of nodes and edges. here i just plot top 3 community and filter the label by nodes with degree centrality >= 3 or betweenness centrality >= 100. The edges color are seperated by interaction type.
+
+```{r, fig.width=8, fig.height=8}
+network_nn %>%
+  activate(nodes) %>%
+  mutate(ids = row_number()) %>%
+  filter(community %in% 1:3) %>% arrange(community,ids) %>%
+  mutate(node_label = ifelse(degree >= 3 | between >= 5,name,"")) %>%
+  mutate(node_size = ifelse(degree >= 3 | between >= 5,degree,0)) %>%
+  ggraph(layout = "linear", circular = T) +
+  geom_edge_arc(alpha = 0.05, aes(col = as.factor(type), edge_width = n*0.5)) +
+  geom_node_label(aes(label = node_label, size = node_size),repel = T,
+                 show.legend = F, fontface = "bold", label.size = 0,
+                 segment.colour="slateblue", fill = "#ffffff66") +
+  coord_fixed() + 
+  labs(title = "Twitter Activity Network #NewNormal",
+       subtitle = "Retweets and mention between 3 top communities") +
+  theme_graph() + 
+  guides(edge_width = F,
+         edge_colour = guide_legend(title = "Tweet Type",
+                                    override.aes = list(edge_alpha = 1))) +
+  theme(legend.position = "bottom", plot.title = element_text(size = rel(2)),
+        plot.subtitle = element_text(size = rel(1)),
+        legend.text = element_text(size = rel(1)))
+  
+```
+
+What can we get from this visualization?
+First, lets see this table
+```{r}
+network_act_df %>% arrange(-degree) %>%
+  group_by(community) %>% slice(1:5)
+```
+Now we can identify which person is belong to which community based on highest degree. The plot is arranged by community and degree, so user in same community is placed near to each other. community #1 (highest community by frequency) are the only community with 2 interaction types. lots of them are retweeting (or quoting) "adrianoqalbi" tweet, and the other are people who mention "ari_maj" in ther tweets. User in community #2 and #3 are just retweeting each other, or maybe some of them make a quote tweet that also goes viral. There's a news account like (detikcom) in community #3, it'll be our evidence that those communities are driven by retweet. I can conclude that top 3 community (by highest frequency) in Twitter activity network is well separated by its tweet types (interactoin types). maybe there's another interesting insight in another community since it creates fewer account by each community.
+
+
+
+# Another additional case: Competition network 
+
+## Case Objectives:
+
+- Analyze **Competition Network** from @kfc_id, @mcd_id, @wendys, @phd account   
+  + Visualize the whole competition network    
+  + Identify fanbase cluster in each account   
+  + Calculate the metrics, and find out who is the `key player` in the whole network   
+   
+ 
+
 # Reference
 **SNA with R:**   
 - [Rtweet homepage](https://rtweet.info/)   
-- [Tidygraph introduction](https://www.data-imaginist.com/2017/introducing-tidygraph/)   
+- [Tidygraph introduction](https://www.data-imaginist.com/2017/introducing-tidygraph/)  
+- [Tidygraph introduction 2](http://mr.schochastics.net/netVizR.html)
 - [R Twitter network example (my main reference)](https://perrystephenson.me/2018/09/29/the-r-twitter-network/)   
 - [Various R packages for SNA](https://www.jessesadler.com/post/network-analysis-with-r/)   
 - [igraph manual pages](https://igraph.org/r/doc/)   
