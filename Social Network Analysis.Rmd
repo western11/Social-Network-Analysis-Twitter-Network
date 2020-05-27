@@ -21,14 +21,13 @@ options(scipen = 999)
 ```
 
 
-**Hello!**
+**Hello!**   
 Welcome to my first internal training. In this markdown, we will learn about `Social Network Analysis` using `tidygraph` (including `igraph` and `ggraph`). We'll not only learn about the visualizing stuff but also the metrics. We'll analyze Twitter network as our study case using `rtweet` package. After this internal training, I hope we will be able to do:   
    
-- Analyze *Ego Network* from specific account/user   
-- Analyze *Competition Network* from various similar account/industries   
+- Analyze *Ego Network* from specific account/user    
 - Analyze *Information Activity Network* from something that goes viral   
 
-**Note:** In 28 March 2019, Kak Eca already deliver a cool internal training about Twitter Interactions using `Twinetverse` <will input the link later>. It has similar idea with this study, we both explain about building network from Twitter data. The difference in this study is we're not only make visualization, but also calculate metrics to achieve the goals for every case (spoiler: we'll do 3 SNA cases). We'll also more focus to how to implement SNA and what it is. This study is theory-driven studies.
+**Note:** In 28 March 2019, Kak Eca already deliver a cool internal training about Twitter Interactions using `Twinetverse` <will input the link later>. It has similar idea with this study, we both explain about building network from Twitter data. The difference in this study is we're not only make visualization, but also calculate metrics to achieve the goals for every case (spoiler: we'll do 2 SNA cases). We'll also more focus to how to implement SNA and what it is. This study is theory-driven studies.
 
 ![](assets/mindmap.png)
 
@@ -42,7 +41,7 @@ A social network is a structure composed of a set of actors, some of which are c
 - Tie Strength: To measure the strength of user's relationship   
 - Network Cohesion: To measure how cohesive entities in the networks towards network behavior.   
 
-**So What? Why do we need them?**   
+**So what? Why do we need them?**   
 Humans are social beings. Even when you sleep, you're still connected to everyone in the world by your smartphone. Your smartphone keep sending and receive information like weather information, incoming whatsapp messages, late night One Piece update, and social media notification from your favourite bias. We're always connected and there's network everywhere. Somehow, some smart dudes behind the famous [Small World Theory](https://en.wikipedia.org/wiki/Small-world_network) found something from the network that quite exciting.
 
 Did you know you only [seperates by six step](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favourite person in the world? We are able to quantify what-so-called network and can be implemented in many fields. In this study we'll only focus on identify network metrics with `key player` as the expected output (see the 4 main types of network metrics above). Here's some implementation of SNA to enlight your knowledge about SNA a bit: (will put reference links later)
@@ -85,7 +84,7 @@ We'll crawl Twitter data using Twitter's rest API. Thus, we need authentication 
 
 Good news! recent update of `rtweet` allows you to interact with Twitter API without create your own Twitter developer account. But it's better if you have one because it gives you more stability and permissions. If you need further explanation, you can head over rtweet’s official website [here](https://rtweet.info/).
 
-In this study, we'll crawl Twitter data without using access token as crendentials. but if things are going bad, i provide some access token we can use to crawl the data. **Note:** Due to rate limit, and most of use will use it at the same time, please use the token wisely.
+In this study, we'll crawl Twitter data without using access token as crendentials. but if things are going bad, i provide some access token we can use to crawl the data. **Note:** Due to rate limit, and most of us will use it at the same time, please use the token wisely.
 
 ```{r, eval=FALSE}
 apikey <- "A5csjkdrS2xxxxxxxxxxx"
@@ -126,7 +125,7 @@ get_token()
 In mathematics, graph theory is the study of graphs, which are mathematical structures used to model pairwise relations between objects. A graph in this context is made up of **vertices** (also called nodes or points) which are connected by **edges** (also called links or lines). In general, A connection between nodes are seperated by 2 types: [Directed and Undirected](https://www.mathworks.com/help/matlab/math/directed-and-undirected-graphs.html). 
 
 - Directed is a relationship between nodes that the edges has direction (The edges have orientations). You will recognize it as edges that has arrow in it. Directed network also separated in 2 type based on its direction, namely: in-degree and out-degree. In-degree represents the number of edges incoming to a vertex/node. In below directed graph, In-degree of A is 1 and degree of D is 2. Out-degree represents the number of edges outgoing from a vertex. In below directed graph, out-degree of A is 1 and out-degree of C is 3.
-```{r}
+```{r, echo=FALSE}
 set.seed(123)
 gp <- matrix(sample(0:1, 16, replace=TRUE), nrow=4)
 colnames(gp) = rownames(gp) = LETTERS[1:4]
@@ -139,7 +138,7 @@ plot(ngp)
 ```
 
 - Undirected indicates two-way relationship, the edges are unidirectional, with no direction associated with them. Hence, the graph can be traversed in either direction. The absence of an arrow tells us that the graph is undirected.
-```{r}
+```{r,echo=FALSE}
 ngp <- graph_from_adjacency_matrix(gp,mode = "undirected")
 plot(ngp)
 ```
@@ -148,7 +147,7 @@ plot(ngp)
 # Case 1: TeamAlgoritma Ego Network
 Ego network is just a simply The concept indicates the amount of all the nodes (here, destinations) to which an ego/node is directly connected and includes all of the ties among nodes in a network. You take any random username/company/person you want to analyze, gather all their neighborhood, and analyze it. sometimes you'll find interesting pattern like this person has a lot of different communities and none of them are look alike, or you can also found a person who can spread information most widely around around your target-person network.
 
-Case objectives:
+Case objectives:    
 - Analyze **Ego Network** from @TeamAlgoritma Twitter account   
   + Visualize top cluster from TeamAlgoritma mutual account   
   + find out which account has the potential to spread information widely   
@@ -192,7 +191,7 @@ We can only gather 15 users (both following and follower) and 5k retrieved for e
 
 After a long inspection, i propose several criteria for filtering active account: `Followers_count` > 100 and < 6000, `following_count` > 75, `favourites_count` > 10, and create a `new twit` at least 2 months ago. I also want to exclude protected account because we actually cant do anything about it, we can't gather their folloing and followers.
 
-```{r}
+```{r, eval=FALSE}
 active_fol <- detail_folower %>% 
   select(user_id,screen_name,created_at,followers_count,friends_count,favourites_count) %>%
   mutate(created_at = ymd_hms(created_at),
@@ -202,6 +201,10 @@ active_fol <- detail_folower %>%
   filter((followers_count > 100 & followers_count < 6000), friends_count > 75, favourites_count > 10, 
          created_at > "2020-03-15") %>%
   arrange(-followers_count)
+```
+```{r}
+# TeamAlgoritma followers is always changing. we will use data i gathered at 15 may 2020
+active_fol <- read.csv("data_input/active_fol.csv")
 ```
 
 
@@ -242,7 +245,7 @@ for (i in seq_along(active_fol$screen_name)) {
 
 ```
 
-After gathering, bind the list to dataframe, convert the username to user_id ny left_join from active_fol data, and build clean data frame without NA
+After gathering, bind the list to dataframe, convert the username to user_id by left_join from active_fol data, and build clean data frame without NA
 ```{r, eval=FALSE}
 # convert list to dataframe
 folerx <- bind_rows(foler, .id = "screen_name")
@@ -264,7 +267,7 @@ algo_follower_df <- read.csv("data_input/follower_algo.csv")
 ```
 
 ## Gather TeamAlgoritma follower's following
-Same like beofre, we build loop function to gather the following. in `rtweet` package, following is also called as `friend`.
+Same like before, we build loop function to gather the following. in `rtweet` package, following is also called as `friend`.
 ```{r}
 active_fol %>% arrange(-friends_count)
 ```
@@ -310,7 +313,6 @@ This loop are also take a long time to run. Again, to speed up our progress, we 
 
 ```{r}
 algo_friend_df <- read.csv("data_input/following_algo.csv")
-
 ```
 
 We need to make sure all unique active user in algo_friend is availiable in algo_following and vice versa
@@ -333,7 +335,7 @@ algo_mutual <- data.frame()
 # in both algo_friend$following and algo_follower$follower column
 # set column name, and store it to algo_mutual df
 
-for (i in seq_along(un_active$user)){
+for (i in seq_along(un_active$active_user)){
   aa <- algo_friend_df %>% filter(active_user == un_active$active_user[i])
   bb <- aa %>% filter(aa$following %in% algo_follower_df$follower) %>%
     setNames(c("mutual","active_user"))
@@ -343,14 +345,13 @@ for (i in seq_along(un_active$user)){
 
 ```
 
-```{r}
-algo_mutual
-```
 It isn't done yet. this is an ego network for TeamAlgoritma account, we want that account to appear in our screen. since TeamAlgoritma is barely follow back is followers, it's not a surprise if we can't found it in mutual dataframe 
 ```{r}
 # check if TeamAlgoritma is presence
 algo_mutual %>% filter(mutual == "943736953274482688")
 ```
+
+
 So we need to add them manually. we already have un_active dataframe contain unique value of active users. we can simply add extra column contain 'TeamAlgoritma" then bind them with algo_mutual df
 ```{r}
 un_active <- un_active %>% mutate(mutual = rep("TeamAlgoritma"))
@@ -362,7 +363,6 @@ algo_mutual <- rbind(algo_mutual,un_active)
 
 algo_mutual
 ```
-
 
 phew we finisihed data gathering step! next we'll jump into SNA process
 
@@ -569,16 +569,18 @@ kp_ego <- data.frame(
 kp_ego
 ```
 
-From the table above, account "1049333510505291778" appear in most centrality. That account has the most degree in the network (high degree) but also surrounded by important person (high eigenvector). TeamAlgoritma is an exception, that's our ego querry so it isn't wise to make it as key player in its own ego network. We can conclude that user "1049333510505291778" is the key player of TeamAlgoritma Twitter ego network, but i need further clarification for this. Eigenvector centrality is highly corelated with degree centrality. Degree centality barely tell us nothing except how many connection they have. i want look at user that appear in the top of most centrality. in this case, user "1025350578505838592" and "483847503" will be our best candidate for key player. Those user appear as top 4 in all centrality. This is where subjective viewpoint comes into play. for me, i'll choose user "1025350578505838592" and "483847503" as TeamAlgoritma ego network Key player
+From the table above, account "1049333510505291776" appear in most centrality. That account has the most degree in the network (high degree) but also surrounded by important person (high eigenvector). TeamAlgoritma is an exception, that's our ego querry so it isn't wise to make it as key player in its own ego network. We can conclude that user "1049333510505291776" is the key player of TeamAlgoritma Twitter ego network.
 
+
+**Note:** after lots of troubleshooting, it seems that user id "1049333510505291776" has been changed to "1049333510505291778". I use old data when i do this analysis (15 may 2020) and twitter user id is changed overtime. 
 Let's see who he/she is:
 ```{r}
-key_player_ego <- lookup_users(c("1025350578505838592","483847503"))
+key_player_ego <- lookup_users("1049333510505291778")
 key_player_ego
 ```
 
 ## Visualize Network
-Let's try visualize the network. I'll scale the nodes by eigenvector, and color it by community. since our network is too large (approximately 14k nodes and 15k edges), i'll filter by only showing community 1 - 3. 
+Let's try visualize the network. I'll scale the nodes by degree centrality, and color it by community. since our network is too large (approximately 14k nodes and 15k edges), i'll filter by only showing community 1 - 3. 
 
 ```{r, eval=FALSE}
 plot_ego <- network_ego1 %>%
@@ -695,18 +697,17 @@ Key player in ego network and activity network have different intepretation. In 
 
 ```{r}
 kp_activity <- data.frame(
-  network_act_df %>% arrange(-degree) %>% select(name) %>% slice(1:5),
-  network_act_df %>% arrange(-between) %>% select(name) %>% slice(1:5),
-  network_act_df %>% arrange(-closeness) %>% select(name) %>% slice(1:5),
-  network_act_df %>% arrange(-eigen) %>% select(name) %>% slice(1:5)
+  network_act_df %>% arrange(-degree) %>% select(name) %>% slice(1:6),
+  network_act_df %>% arrange(-between) %>% select(name) %>% slice(1:6),
+  network_act_df %>% arrange(-closeness) %>% select(name) %>% slice(1:6),
+  network_act_df %>% arrange(-eigen) %>% select(name) %>% slice(1:6)
 ) %>% setNames(c("degree","betweenness","closeness","eigen"))
 
 kp_activity
 ```
-
-From the table above, "Timothy_Hughes" grab our attention the most. he/she appear in most centrality. Thus we can conclude he/she is the key player in #NewNormal Twitter actiity network. Let's see his tweets
+We got interesting result here. every top centrality have different account. It means every top user is great in their own 'job' on the network. we can tell that there's no super user in #NewNormal network. From the table above, "adrianoqalbi" grab my attention the most. he appear in 2 centrality (if we remove NA in eigenvector centrality). Thus we can conclude he is the key player in #NewNormal Twitter actiity network. Let's see his tweets
 ```{r}
-newnorm %>% filter(screen_name == "Timothy_Hughes") %>% arrange(-retweet_count)
+newnorm %>% filter(screen_name == "adrianoqalbi") %>% arrange(-retweet_count)
 ```
 
 ## Visualize network
@@ -751,7 +752,7 @@ Now we can identify which person is belong to which community based on highest d
 
 ## Case Objectives:
 
-- Analyze **Competition Network** from @kfc_id, @mcd_id, @wendys, @phd account   
+- Analyze **Competition Network** from (for example) @kfc_id, @mcd_id, @wendys, @phd account   
   + Visualize the whole competition network    
   + Identify fanbase cluster in each account   
   + Calculate the metrics, and find out who is the `key player` in the whole network   
