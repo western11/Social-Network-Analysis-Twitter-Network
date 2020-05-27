@@ -370,6 +370,19 @@ write.csv(dummnet,"product_dum_net.csv",row.names = F)
 
 ```
 
+```{r}
+pdct <- read.csv("product_net2.csv",fileEncoding="UTF-8-BOM")
+rownames(pdct) <- pdct[,1]
+pdct[,1] <- NULL
+
+pdct <- as.matrix(pdct)
+pdctdum <- graph_from_adjacency_matrix(pdct,mode = "directed",diag = F)
+dumdum <- graph.adjacency(pdct)
+
+dumdumdum <- get.edgelist(dumdum) %>% as.data.frame() %>% setNames(c("from","to"))
+write.csv(dumdumdum,"product_exnet.csv",row.names = F)
+```
+
 To do next:
 - find account that not included in algo_friend v
 - subset account that not following "943736953274482688" in algo_friend v

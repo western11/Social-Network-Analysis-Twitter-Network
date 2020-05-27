@@ -420,16 +420,14 @@ network_ego_df
 ## Graph Metrics
 Before we make a conclusion from the table above, let's take a time to learn what's the idea behind those metrics. We'll build network from Algoritma Product Team as dummy network to make the explanation easier, and just to inform you how SNA works in real case
 ```{r}
-product_df <- read.csv("data_input/product_dum_net.csv",stringsAsFactors = F)
+product_df <- read.csv("data_input/product_exnet.csv",stringsAsFactors = F)
 
 nodes_dum <- data.frame(V = unique(c(product_df$from,product_df$to)),
                         stringsAsFactors = F)
-
 edge_dum <- product_df
 
-product_net <- graph_from_data_frame(d = edge_dum, vertices = nodes_dum, directed = F) %>%
+product_net <- graph_from_data_frame(d = edge_dum, vertices = nodes_dum, directed = T) %>%
   as_tbl_graph()
-
 
 ```
 ```{r message=FALSE,warning=FALSE}
@@ -443,7 +441,7 @@ The easiest centrality among them all. Its just **how many ties that a node has*
 
 ```{r}
 product_net %>% 
-  mutate(degree = centrality_degree()) %>%
+  mutate(degree = centrality_degree(mode = "in")) %>%
   ggraph(layout = "fr") +
   geom_edge_fan(alpha = 0.25) +
   geom_node_point(aes(size = degree,color = degree)) +
@@ -458,7 +456,7 @@ product_net %>%
 ```{r}
 # Tiara network neighbors
 g_ti <- induced.subgraph(product_net, c(2, neighbors(product_net,2)))
-g_ti %>% plot(edge.arrow.size = 0,layout = layout.star(g_ti,center = V(g_ti)[2]))
+g_ti %>% plot(edge.arrow.size = 0.5,layout = layout.star(g_ti,center = V(g_ti)[1]))
 ```
 
 
