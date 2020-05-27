@@ -1,4 +1,6 @@
 # Social Network Analysis: Twitter Network Quiz
+**INSTRUCTION:**
+Open quiz.html or quiz.Rmd to see the plot
 
 ## Graph theory and SNA
 
@@ -12,7 +14,7 @@ This section will assess your understanding of Graph theory and SNA
 
 2. From the picture below. Calculate the *shortest path* between nodes 4 to nodes 13
 
-![](https://github.com/western11/Social-Network-Analysis-Twitter-Network/blob/master/assets/qz1.PNG)
+assets/qz1.png
 
 - [ ] 6
 - [ ] 5
@@ -83,15 +85,11 @@ Visualize the network using this characteristic: (you need to do this in order)
   + theme_graph()
 
 6. from your plot output, select the most similar picture below
-___
-- [ ] a ![a](https://github.com/western11/Social-Network-Analysis-Twitter-Network/blob/master/assets/opt_a.PNG)
-___
-___
-- [ ] b ![b](https://github.com/western11/Social-Network-Analysis-Twitter-Network/blob/master/assets/opt_b.PNG)
-___
-___
-- [ ] c ![c](https://github.com/western11/Social-Network-Analysis-Twitter-Network/blob/master/assets/opt_c.PNG)
-___
+
+- [ ] a assets/opt_a.PNG
+- [ ] b assets/opt_b.PNG
+- [ ] c assets/opt_c.PNG)
+
 
 7. Imagine this is a terrorist communication network. They use small community (also called as subgraph) to communicate to avoid suspicion. We are told to find **which node is the most important for spreading information between subgraph**. **Without using any filter and communtiy**, calculate eigenvector, betweenness, closeness, degree centrality and select which pair of nodes that need to be terminated first.
 - [ ] 66, 104
