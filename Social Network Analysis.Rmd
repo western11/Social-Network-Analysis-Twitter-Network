@@ -6,7 +6,8 @@ output:
   html_document:
    toc: true
    toc_float: true
-   toc_depth: 2
+   toc_depth: 3
+   number_sections: true
    theme: flatly
    highlight: zenburn
    df_print: paged
@@ -121,7 +122,29 @@ mytoken_1 <- readRDS("data_input/token_1.rds")
 get_token()
 ```
 
+## Graph Theory
+In mathematics, graph theory is the study of graphs, which are mathematical structures used to model pairwise relations between objects. A graph in this context is made up of **vertices** (also called nodes or points) which are connected by **edges** (also called links or lines). In general, A connection between nodes are seperated by 2 types: [Directed and Undirected](https://www.mathworks.com/help/matlab/math/directed-and-undirected-graphs.html). 
+
+- Directed is a relationship between nodes that the edges has direction (The edges have orientations). You will recognize it as edges that has arrow in it. Directed network also separated in 2 type based on its direction, namely: in-degree and out-degree. In-degree represents the number of edges incoming to a vertex/node. In below directed graph, In-degree of A is 1 and degree of D is 2. Out-degree represents the number of edges outgoing from a vertex. In below directed graph, out-degree of A is 1 and out-degree of C is 3.
+```{r}
+set.seed(123)
+gp <- matrix(sample(0:1, 16, replace=TRUE), nrow=4)
+colnames(gp) = rownames(gp) = LETTERS[1:4]
  
+# build the graph object
+ngp <- graph_from_adjacency_matrix(gp,mode = "directed")
+ 
+# plot it
+plot(ngp)
+```
+
+- Undirected indicates two-way relationship, the edges are unidirectional, with no direction associated with them. Hence, the graph can be traversed in either direction. The absence of an arrow tells us that the graph is undirected.
+```{r}
+ngp <- graph_from_adjacency_matrix(gp,mode = "undirected")
+plot(ngp)
+```
+
+
 # Case 1: TeamAlgoritma Ego Network
 Ego network is just a simply The concept indicates the amount of all the nodes (here, destinations) to which an ego/node is directly connected and includes all of the ties among nodes in a network. You take any random username/company/person you want to analyze, gather all their neighborhood, and analyze it. sometimes you'll find interesting pattern like this person has a lot of different communities and none of them are look alike, or you can also found a person who can spread information most widely around around your target-person network.
 
@@ -301,7 +324,7 @@ Now we have both following and follower data. We need to build 'mutual' data to 
 ```{r}
 # collect unique user_id in algo_friend df
 un_active <- unique(algo_friend_df$active_user) %>% data.frame(stringsAsFactors = F) %>%
-  setNames("user")
+  setNames("active_user")
 
 # create empty dataframe
 algo_mutual <- data.frame()
@@ -311,7 +334,7 @@ algo_mutual <- data.frame()
 # set column name, and store it to algo_mutual df
 
 for (i in seq_along(un_active$user)){
-  aa <- algo_friend_df %>% filter(active_user == un_active$user[i])
+  aa <- algo_friend_df %>% filter(active_user == un_active$active_user[i])
   bb <- aa %>% filter(aa$following %in% algo_follower_df$follower) %>%
     setNames(c("mutual","active_user"))
   
@@ -323,6 +346,23 @@ for (i in seq_along(un_active$user)){
 ```{r}
 algo_mutual
 ```
+It isn't done yet. this is an ego network for TeamAlgoritma account, we want that account to appear in our screen. since TeamAlgoritma is barely follow back is followers, it's not a surprise if we can't found it in mutual dataframe 
+```{r}
+# check if TeamAlgoritma is presence
+algo_mutual %>% filter(mutual == "943736953274482688")
+```
+So we need to add them manually. we already have un_active dataframe contain unique value of active users. we can simply add extra column contain 'TeamAlgoritma" then bind them with algo_mutual df
+```{r}
+un_active <- un_active %>% mutate(mutual = rep("TeamAlgoritma"))
+# swap column oreder
+un_active <- un_active[,c(2,1)]
+
+# rbind to algo_mutual df
+algo_mutual <- rbind(algo_mutual,un_active)
+
+algo_mutual
+```
+
 
 phew we finisihed data gathering step! next we'll jump into SNA process
 
@@ -360,6 +400,7 @@ V(network_ego1)$betwenness <- betweenness(network_ego1, v = V(network_ego),direc
 
 Create communities using `group_walktrap()` algorithm, and calculate lots of metrics using `tidygraph` style 
 ```{r}
+set.seed(123)
 network_ego1 <- network_ego1 %>% 
   mutate(community = as.factor(group_walktrap())) %>%
   mutate(degree_c = centrality_degree()) %>%
@@ -375,7 +416,6 @@ We can easily convert it to dataframe using `as.data.frame()` function. We need 
 network_ego_df <- as.data.frame(network_ego1)
 network_ego_df
 ```
-
 
 ## Graph Metrics
 Before we make a conclusion from the table above, let's take a time to learn what's the idea behind those metrics. We'll build network from Algoritma Product Team as dummy network to make the explanation easier, and just to inform you how SNA works in real case
@@ -399,8 +439,7 @@ loadfonts(device = "win")
 ```
 
 ### Degree Centrality   
-The easiest centrality among them all. Its just **how many ties that a node has**. A connection between nodes are seperated by 2 types: [Directed and Undirected](https://www.mathworks.com/help/matlab/math/directed-and-undirected-graphs.html). Directed is a relationship between nodes that the edges has direction. Undirected indicates two-way relationship, it doesnt has any direction. Directed network also separated in 2 type based on its direction, namely: indegree and outdegree. The calculation for directed and undirected are kinda different but it have a same idea: how many nodes is connected to a node. 
-
+The easiest centrality among them all. Its just **how many ties that a node has**. The calculation for directed and undirected are kinda different but it have a same idea: how many nodes is connected to a node. 
 
 ```{r}
 product_net %>% 
@@ -523,41 +562,56 @@ Key player is a terms for the most influential users in the network based on dif
 
 ```{r}
 kp_ego <- data.frame(
-  network_ego_df %>% arrange(-degree_c) %>% select(name) %>% slice(1:5),
-  network_ego_df %>% arrange(-betweenness_c) %>% select(name) %>% slice(1:5),
-  network_ego_df %>% arrange(-closeness_c) %>% select(name) %>% slice(1:5),
-  network_ego_df %>% arrange(-eigen) %>% select(name) %>% slice(1:5)
+  network_ego_df %>% arrange(-degree_c) %>% select(name) %>% slice(1:6),
+  network_ego_df %>% arrange(-betweenness_c) %>% select(name) %>% slice(1:6),
+  network_ego_df %>% arrange(-closeness_c) %>% select(name) %>% slice(1:6),
+  network_ego_df %>% arrange(-eigen) %>% select(name) %>% slice(1:6)
 ) %>% setNames(c("degree","betweenness","closeness","eigen"))
 
 kp_ego
 ```
 
-From the table above, account "1049333510505291778" appear in most centrality. That account has the most degree in the network (high degree) but also surrounded by important person (high eigenvector). Thus, we can conclude that user "1049333510505291778" is the key player of TeamAlgoritma Twitter ego network.
+From the table above, account "1049333510505291778" appear in most centrality. That account has the most degree in the network (high degree) but also surrounded by important person (high eigenvector). TeamAlgoritma is an exception, that's our ego querry so it isn't wise to make it as key player in its own ego network. We can conclude that user "1049333510505291778" is the key player of TeamAlgoritma Twitter ego network, but i need further clarification for this. Eigenvector centrality is highly corelated with degree centrality. Degree centality barely tell us nothing except how many connection they have. i want look at user that appear in the top of most centrality. in this case, user "1025350578505838592" and "483847503" will be our best candidate for key player. Those user appear as top 4 in all centrality. This is where subjective viewpoint comes into play. for me, i'll choose user "1025350578505838592" and "483847503" as TeamAlgoritma ego network Key player
 
 Let's see who he/she is:
 ```{r}
-key_player_ego <- lookup_users("1049333510505291778")
+key_player_ego <- lookup_users(c("1025350578505838592","483847503"))
 key_player_ego
 ```
 
 ## Visualize Network
 Let's try visualize the network. I'll scale the nodes by eigenvector, and color it by community. since our network is too large (approximately 14k nodes and 15k edges), i'll filter by only showing community 1 - 3. 
 
-```{r}
-network_ego1 %>%
+```{r, eval=FALSE}
+plot_ego <- network_ego1 %>%
   filter(community %in% 1:3) %>%
-  mutate(node_size = ifelse(degree_c >= 20,log(degree_c),0)) %>%
+  top_n(1000,degree_c) %>%
+  mutate(node_size = ifelse(degree_c >= 20,degree_c,0)) %>%
+  mutate(node_label = ifelse(betweenness_c >= 0.06,name,"")) %>%
   ggraph(layout = "stress") +
-  geom_edge_fan(alpha = 0.25) +
+  geom_edge_fan(alpha = 0.05) +
   geom_node_point(aes(color = as.factor(community),size = node_size)) +
+  geom_node_label(aes(label = node_label),repel = T,
+                 show.legend = F, fontface = "bold", label.size = 0,
+                 segment.colour="slateblue", fill = "#ffffff66") +
+  coord_fixed() +
   theme_graph() + theme(legend.position = "none") +
   labs(title = "TeamAlgoritma Mutual Communities",
        subtitle = "Top 3 Community")
 
+saveRDS(plot_ego,"plotego.rds")
+```
+This process take 30-40 minutes in my pc. i save the plot in rds file to speed up our process
+```{r, fig.width=8, fig.height=8}
+plot_ego1 <- readRDS("data_input/plotego.rds")
+plot_ego1
 ```
 
-# Additional case: Activity Network
-This section is additional. Activity network analyze how information is spread around the network. From this analysis, we can found how something goes viral and how people interact with it. Because this network contain all form of Twitter communication (even a single retweet), the visualization will most likely become a hairball. You will need a lot of data featuring or filtering for visualization purpose, but in the end it will be up to your preferences.   
+What can we get from this visualization?
+This obviously doesn’t tell much of a story (we need further inspection in the data, matching it to the visualization), but it shows that the “random walk” community detection algorithm is picking up on the same structure as "stress" layout algorithm. TeamAlgoritma as our ego appear in the middle, act as a bridge who connects all cluster. we only show user label who has high betweenness centrality value. a mushroom-shape nodes behind them are their mutual friends who doesn't follow TeamAlgoritma account. That user is our potential reader if their 'bridge' retweeting or mentionin something about TeamAlgoritma account. user in same community or who close to each other maybe know each other in real life. they create their own community. both key player are in a same community (community #1 i presume), that is TeamAlgoritma's most important community because they have the most potential to spread information fast and widely. 
+
+# Case 2: Activity Network
+Activity network analyze how information is spread around the network. From this analysis, we can found how something goes viral and how people interact with it. Because this network contain all form of Twitter communication (even a single retweet), the visualization will most likely become a hairball. You will need a lot of data featuring or filtering for visualization purpose, but in the end it will be up to your preferences.   
 
 ## Case Objective
 - Analyze **Activity Network** given random keyword(s) or hashtag   
