@@ -13,9 +13,6 @@ This section will assess your understanding of Graph theory and SNA
   - [ ] all of the above
 
 2. From the picture below. Calculate the *shortest path* between nodes 4 to nodes 13
-
-assets/qz1.png
-
   - [ ] 6
   - [ ] 5
   - [ ] 7
@@ -72,20 +69,19 @@ set.seed(123)
 small_qz <- play_smallworld(1,250,3,0.05)
 ```
 Visualize the network using this characteristic: (you need to do this in order)
-- in top of your chunk, make sure to input set.seed(123)
-- create nodes name by row_number() and create network community using group_louvain() algorithm using mutate()
-- filter the nodes that only appear in community 1:2
-- using mutate(), calculate eigenvector centrality with centrality_eigen() function (no parameter)
-- select 25 nodes with highest eigenvector centarlity value
-- Visualize the network using: 
-  + ggraph() function with "kk" as the layout
-  + geom_edge_fan()
-  + geom_node_point()
-  + geom_node_text -> only show nodes label with eigenvector centarlity value >= 1. use parameter repel=T
-  + theme_graph()
+in top of your chunk, make sure to input set.seed(123)
+create nodes name by row_number() and create network community using group_louvain() algorithm using mutate()
+ilter the nodes that only appear in community 1:2
+using mutate(), calculate eigenvector centrality with centrality_eigen() function (no parameter)
+select 25 nodes with highest eigenvector centarlity value
+visualize the network using: 
+ggraph() function with "kk" as the layout
+geom_edge_fan()
+geom_node_point()
+geom_node_text -> only show nodes label with eigenvector centarlity value >= 1. use parameter repel=T
+theme_graph()
 
 6. from your plot output, select the most similar picture below
-
   - [ ] a assets/opt_a.PNG
   - [ ] b assets/opt_b.PNG
   - [ ] c assets/opt_c.PNG)
