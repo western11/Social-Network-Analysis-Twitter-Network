@@ -44,7 +44,7 @@ A social network is a structure composed of a set of actors, some of which are c
 **So what? Why do we need them?**   
 Humans are social beings. Even when you sleep, you're still connected to everyone in the world by your smartphone. Your smartphone keeps sending and receive information like weather information, incoming whatsapp messages, late-night One Piece update, and social media notification from your favorite bias. We're always connected and there's network everywhere. Somehow, some smart dudes behind the famous [Small World Theory](https://en.wikipedia.org/wiki/Small-world_network) found something from the network that quite exciting.
 
-Did you know you only [seperates by six steps](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favorite person in the world? We are able to quantify the what-so-called network and can be implemented in many fields. In this study, we'll only focus on identify network metrics with `key player` as the expected output (see the 4 main types of network metrics above). Here's some implementation of SNA to enlight your knowledge about SNA a bit: (will put reference links later)
+Did you know you only [seperates by six steps](https://en.wikipedia.org/wiki/Six_degrees_of_separation) from your favorite person in the world? We are able to quantify the what-so-called network and can be implemented in many fields. In this study, we'll only focus on identify network metrics with `key player` as the expected output (see the 4 main types of network metrics above). Here's some implementation of SNA to enlight your knowledge about SNA a bit:    
 
 - Business:   
   + [Social media segmentation](https://www.researchgate.net/publication/320653694_Social_network_data_analytics_for_market_segmentation_in_Indonesian_telecommunications_industry)   
@@ -459,7 +459,7 @@ g_ti %>% plot(edge.arrow.size = 0.5,layout = layout.star(g_ti,center = V(g_ti)[1
 
 
 ### Closeness centrality
-The closeness centrality of a node is the **average length of the shortest path** between the node and all other nodes in the graph. Thus the more central a node is, the closer it is to all other nodes.
+The closeness centrality of a node is the **average length of the shortest path (geodesic)** between the node and all other nodes in the graph. Thus the more central a node is, the closer it is to all other nodes.
 $$C(i) = \frac{N-1}{\sum_{j}d(j,i)}$$
 $d(j,i)$ is the distance between vertices $j$ and $i$. This centrality divide total number of nodes minus 1($N-1$) by total number of every shorthest path between one node to every node in the graph.
 
@@ -480,7 +480,7 @@ product_net %>%
 ### Betweenness centrality
 Betweenness centrality quantifies the number of times a node acts as a bridge along the shortest path between two other nodes/groups.  
 $$C_{B}(v) = \sum_{ij}\frac{\sigma_{ij}(v)}{\sigma_{ij}}$$
-Where $\sigma_{ij}$ is total number of shortest paths from node $x$ to node $y$ and $\sigma_{ij}(v)$ is the number of those paths that pass through $v$ 
+Where $\sigma_{ij}$ is total number of shortest paths from node $i$ to node $j$ and $\sigma_{ij}(v)$ is the number of those paths that pass through $v$ 
 
 ```{r}
 product_net %>% 
