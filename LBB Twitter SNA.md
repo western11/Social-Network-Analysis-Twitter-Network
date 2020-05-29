@@ -6,7 +6,7 @@ Choose one case and create a report using social network analysis method from Tw
 - Analyze *Information Activity Network* from something that goes viral
 - Analyze *Competition Network* from various account in the same industry
 
-**Deadline: 2 June 2020**   
+**Deadline: 5 June 2020**   
 Submit: HTML / Rmd file to my trello card "LBB Submission: SNA Twitter"
 
 The rubrics for the LBB are as follows:
